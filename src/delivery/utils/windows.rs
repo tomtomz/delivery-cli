@@ -50,7 +50,6 @@ pub fn remove_recursive<P: ?Sized>(path: &P) -> Result<(), DeliveryError>
         Ok(_) => {
             // only remove if there is something there
             let result = try!(make_command("Remove-Item")
-                              .arg("Remove-Item")
                               .arg("-recurse")
                               .arg("-force")
                               .arg(path.as_ref().to_str().unwrap())
