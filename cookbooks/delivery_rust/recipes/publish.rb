@@ -105,4 +105,18 @@ when "rhel"
       sensitive true
     end
   end
+when "windows"
+  [ "8.1" ].each do |pv|
+    delivery_rust_artifactory "delivery-cli" do
+      package_path ::File.join(omnibus_path, "*.msi")
+      repository 'omnibus-current-local'
+      platform 'windows'
+      platform_version pv
+      endpoint 'http://artifactory.chef.co/'
+      base_path 'com/getchef'
+      username 'delivery'
+      password secrets['artifactory_password']
+      sensitive true
+
+
 end

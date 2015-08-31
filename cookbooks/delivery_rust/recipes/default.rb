@@ -7,7 +7,6 @@
 
 include_recipe "delivery_rust::_prep_builder"
 
-
 if windows?
   windows_package "rust" do
     source "https://static.rust-lang.org/dist/#{node['delivery_rust']['rust_version']}/rust-nightly-x86_64-pc-windows-gnu.msi"
