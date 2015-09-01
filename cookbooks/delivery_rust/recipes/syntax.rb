@@ -6,7 +6,7 @@ execute "git config --global user.email \"delivery@chef.com\"" do
   cwd node['delivery_builder']['repo']
 end
 
-execute "git config --global user.name \"Devliery\"" do
+execute "git config --global user.name \"Delivery\"" do
   cwd node['delivery_builder']['repo']
 end
 
