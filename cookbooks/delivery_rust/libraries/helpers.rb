@@ -35,9 +35,6 @@ module DeliveryRust
     rescue Errno::ENOENT
       "NONE"
     end
-    def windows?
-	      !!(RUBY_PLATFORM =~ /mswin|mingw|windows/)
-    end
   end
 
   module DSL
@@ -47,9 +44,6 @@ module DeliveryRust
 
     def current_rust_version
       DeliveryRust::Helpers.current_rust_version
-    end
-    def windows?
-      DeliveryRust::Helpers.windows?
     end
   end
 end

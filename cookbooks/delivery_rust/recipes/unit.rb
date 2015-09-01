@@ -1,3 +1,5 @@
+include_recipe 'chef-sugar::default'
+
 execute "cargo clean" do
   cwd node['delivery_builder']['repo']
 end

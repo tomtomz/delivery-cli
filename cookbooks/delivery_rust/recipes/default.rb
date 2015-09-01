@@ -4,6 +4,8 @@
 #
 # Copyright (C) Chef Software, Inc. 2014
 #
+include_recipe 'chef-sugar::default'
+require 'chef/sugar/core_extensions'
 
 include_recipe "delivery_rust::_prep_builder"
 
