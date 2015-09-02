@@ -1,3 +1,5 @@
 source "https://supermarket.chef.io"
 
+cookbook 'delivery-sugar' git: 'https://github.com/chef-cookbooks/delivery-sugar'
+
 metadata
