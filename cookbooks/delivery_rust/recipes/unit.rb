@@ -1,6 +1,12 @@
 include_recipe 'chef-sugar::default'
 
 execute "cargo clean" do
+  if windows?
+    ruby_version = node['omnibus']['ruby_version']
+    environment({
+      'PATH' => "C:/rubies/#{ruby_version}/bin;C:/rubies/#{ruby_version}/mingw/bin;C:/Program Files (x86)/Git/Cmd;C:/Program Files (x86)/Git/libexec/git-core;C:/wix;C:/7-zip;C:/Program Files (x86)/Windows Kits/8.1/bin/x64;C:/Windows/system32;C:/Windows;C:/Windows/System32/Wbem;C:/Program Files/OpenSSH/bin;C:/opscode/chef/bin/;C:/opscode/chefdk/bin/;C:/tools/mingw64/bin;C:/Program Files/Rust nightly 1.4/bin;C:/chef/delivery-cli/bin;C:/chef/delivery-cli/bin"
+    })
+  end
   cwd node['delivery_builder']['repo']
 end
 
