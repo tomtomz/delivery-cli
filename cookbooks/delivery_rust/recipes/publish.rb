@@ -106,7 +106,7 @@ when "rhel"
     end
   end
 when "windows"
-  [ "8.1" ].each do |pv|
+  [ "2008R2" ].each do |pv|
     delivery_rust_artifactory "delivery-cli" do
       package_path ::File.join(omnibus_path, "*.msi")
       repository 'omnibus-current-local'
