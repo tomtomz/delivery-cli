@@ -35,7 +35,7 @@ execute "cargo test" do
       'OPENSSL_INCLUDE_DIR' => 'C:/OpenSSL-Win64/include',
       'OPENSSL_LIB_DIR' => 'C:/OpenSSL-Win64',
       'LD_LIBRARY_PATH' => 'C:/OpenSSL-Win64',
-      'SSL_CERT_FILE' => 'C:/rubies/2.1.6-x64/ssl/certs/cacert.pem'
+      'SSL_CERT_FILE' => 'C:/opscode/chefdk/embedded/ssl/certs/cacert.pem'
     })
   end
   cwd node['delivery_builder']['repo']
