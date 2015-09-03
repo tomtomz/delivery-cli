@@ -13,6 +13,7 @@ if windows?
   windows_package "rust" do
     source "https://static.rust-lang.org/dist/#{node['delivery_rust']['rust_version']}/rust-nightly-x86_64-pc-windows-gnu.msi"
   end
+  include_recipe "omnibus::ruby"
 else
   cache_dir = Chef::Config[:file_cache_path]
 
