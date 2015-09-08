@@ -1,5 +1,6 @@
 include_recipe 'chef-sugar::default'
 
+ruby_version = '2.1.6-x64'
 execute "cargo clean" do
   cwd node['delivery_builder']['repo']
 end

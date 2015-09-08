@@ -15,7 +15,7 @@
     ],
     "build_nodes": {
         "default"    : ["name:builder*.shd.chef.co"],
-        "unit"       : ["name:builder*.shd.chef.co AND platform_family:debian", "name:builder*.shd.chef.co AND platform_family:rhel"],
+        "unit"       : ["name:builder*.shd.chef.co AND platform_family:debian", "name:builder*.shd.chef.co AND platform_family:rhel", "name:win-builder*.shd.chef.co AND platform_family:windows"],
         "syntax"     : ["name:builder*.shd.chef.co AND platform_family:debian", "name:builder*.shd.chef.co AND platform_family:rhel"],
         "publish"    : ["name:builder*.shd.chef.co AND platform_family:debian", "name:builder*.shd.chef.co AND platform_family:rhel"]
     }
