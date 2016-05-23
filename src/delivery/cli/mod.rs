@@ -5,6 +5,7 @@ use std::process::Stdio;
 use std::error::Error;
 use std::path::PathBuf;
 use std::io::prelude::*;
+use std::time::Duration;
 use std;
 use token;
 use project;
@@ -36,13 +37,13 @@ macro_rules! make_arg_vec {
 
 macro_rules! fn_arg {
     ( $fn_name:ident, $usage:expr ) => (
-        fn $fn_name<'a>() -> Arg<'a, 'a, 'a, 'a, 'a, 'a> {
+        fn $fn_name<'a>() -> Arg<'a, 'a> {
             Arg::from_usage($usage)
         }
     )
 }
 
-fn u_e_s_o_args<'a>() -> Vec<Arg<'a, 'a, 'a, 'a, 'a, 'a>> {
+fn u_e_s_o_args<'a>() -> Vec<Arg<'a, 'a>> {
     make_arg_vec![
         "-u --user=[user] 'User name for Delivery authentication'",
         "-e --ent=[enterprise] 'The enterprise in which the project lives'",
@@ -50,7 +51,7 @@ fn u_e_s_o_args<'a>() -> Vec<Arg<'a, 'a, 'a, 'a, 'a, 'a>> {
         "-s --server=[server] 'The Delivery server address'"]
 }
 
-fn scp_args<'a>() -> Vec<Arg<'a, 'a, 'a, 'a, 'a, 'a>> {
+fn scp_args<'a>() -> Vec<Arg<'a, 'a>> {
     make_arg_vec![
         "--bitbucket=[project-key] 'Use a Bitbucket repository for Code Review with the provided Project Key'",
         "--github=[org-name] 'Use a Github repository for Code Review with the provided Organization'",
@@ -144,9 +145,10 @@ pub fn run() {
         Some("spin") => {
             let matches = matches.subcommand_matches("spin").unwrap();
             handle_spinner(&matches);
-            let tsecs = value_of(&matches, "TIME").parse::<u32>().unwrap();
+            let tsecs = value_of(&matches, "TIME").parse::<u64>().unwrap();
             let spinner = utils::say::Spinner::start();
-            std::thread::sleep_ms(1000 * tsecs);
+            let sleep_time = Duration::from_secs(tsecs);
+            std::thread::sleep(sleep_time);
             spinner.stop();
             handle_spinner(&matches);
             Ok(())
@@ -166,7 +168,7 @@ pub fn run() {
     }
 }
 
-fn make_app<'a>(version: &'a str) -> App<'a, 'a, 'a, 'a, 'a, 'a> {
+fn make_app<'a>(version: &'a str) -> App<'a, 'a> {
     App::new("delivery")
         .version(version)
         .arg(no_spinner_arg().global(true))
@@ -177,7 +179,7 @@ fn make_app<'a>(version: &'a str) -> App<'a, 'a, 'a, 'a, 'a, 'a> {
                     // sub-command specific help via an include file
                     // like this:
                     // .after_help(include!("../help/create-change.txt"))
-                    .args(vec![for_arg(), no_open_arg(), auto_bump()])
+                    .args(&vec![for_arg(), no_open_arg(), auto_bump()])
                     .args_from_usage(
                         "-e --edit 'Edit change title and description'"))
         .subcommand(SubCommand::with_name("clone")
@@ -186,15 +188,15 @@ fn make_app<'a>(version: &'a str) -> App<'a, 'a, 'a, 'a, 'a, 'a> {
                         "<project> 'Name of project to clone'
                         -g --git-url=[url] \
                         'Git URL (-u -s -e -o ignored if used)'")
-                    .args(u_e_s_o_args()))
+                    .args(&u_e_s_o_args()))
         .subcommand(SubCommand::with_name("checkout")
                     .about("Create a local branch tracking an in-progress change")
-                    .args(vec![for_arg(), patchset_arg()])
+                    .args(&vec![for_arg(), patchset_arg()])
                     .args_from_usage(
                         "<change> 'Name of the feature branch to checkout'"))
         .subcommand(SubCommand::with_name("diff")
                     .about("Display diff for a change")
-                    .args(vec![for_arg(), patchset_arg()])
+                    .args(&vec![for_arg(), patchset_arg()])
                     .args_from_usage(
                         "<change> 'Name of the feature branch to compare'
                         -l --local \
@@ -202,23 +204,23 @@ fn make_app<'a>(version: &'a str) -> App<'a, 'a, 'a, 'a, 'a, 'a> {
         .subcommand(SubCommand::with_name("init")
                     .about("Initialize a Delivery project \
                             (and lots more!)")
-                    .args(vec![for_arg(), config_path_arg(), no_open_arg(),
+                    .args(&vec![for_arg(), config_path_arg(), no_open_arg(),
                                project_arg(), local_arg(), config_project_arg()])
                     .args_from_usage(
                         "--generator=[generator] 'Local path or Git repo URL to a \
                          custom ChefDK build-cookbook generator (default:github)'
                         --skip-build-cookbook 'Do not create a build cookbook'")
-                    .args(u_e_s_o_args())
-                    .args(scp_args()))
+                    .args(&u_e_s_o_args())
+                    .args(&scp_args()))
         .subcommand(SubCommand::with_name("setup")
                     .about("Write a config file capturing specified options")
-                    .args(vec![for_arg(), config_path_arg()])
-                    .args(u_e_s_o_args()))
+                    .args(&vec![for_arg(), config_path_arg()])
+                    .args(&u_e_s_o_args()))
         .subcommand(SubCommand::with_name("job")
                     .about("Run one or more phase jobs")
-                    .args(vec![patchset_arg(), project_arg(), for_arg(),
-                               local_arg()])
-                    .args(make_arg_vec![
+                    .args(&vec![patchset_arg(), project_arg(), for_arg(),
+                                local_arg()])
+                    .args(&make_arg_vec![
                         "-j --job-root=[root] 'Path to the job root'",
                         "-g --git-url=[url] 'Git URL (-u -s -e -o ignored if used)'",
                         "-C --change=[change] 'Feature branch name'",
@@ -229,19 +231,19 @@ fn make_app<'a>(version: &'a str) -> App<'a, 'a, 'a, 'a, 'a, 'a> {
                         "--docker=[image] 'Docker image'"])
                     .args_from_usage("<stage> 'Stage for the run'
                                       <phases> 'One or more phases'")
-                    .args(u_e_s_o_args()))
+                    .args(&u_e_s_o_args()))
         .subcommand(SubCommand::with_name("api")
                     .about("Helper to call Delivery's HTTP API")
-                    .args(vec![config_path_arg()])
+                    .args(&vec![config_path_arg()])
                     .args_from_usage(
                         "<method> 'HTTP method for the request'
                          <path> 'Path for rqeuest URL'
                          --api-port=[port] 'Port for Delivery server'
                          -d --data=[data] 'Data to send for PUT/POST request'")
-                    .args(u_e_s_o_args()))
+                    .args(&u_e_s_o_args()))
         .subcommand(SubCommand::with_name("token")
                     .about("Create a local API token")
-                    .args(make_arg_vec![
+                    .args(&make_arg_vec![
                         "-u --user=[user] 'User name for Delivery authentication'",
                         "-e --ent=[enterprise] 'The enterprise in which the project lives'",
                         "--verify 'Verify the Token has expired'",
@@ -250,8 +252,7 @@ fn make_app<'a>(version: &'a str) -> App<'a, 'a, 'a, 'a, 'a, 'a> {
                         "--api-port=[port] 'Port for Delivery server'"))
         .subcommand(SubCommand::with_name("spin")
                     .about("test the spinner")
-                    .args_from_usage("-t --time=[TIME] 'How man seconds to spin'")
-                    .hidden(true))
+                    .args_from_usage("-t --time=[TIME] 'How man seconds to spin'"))
 }
 
 fn handle_spinner(matches: &ArgMatches) {
