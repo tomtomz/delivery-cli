@@ -46,7 +46,7 @@ macro_rules! fn_arg {
 fn u_e_s_o_args<'a>() -> Vec<Arg<'a, 'a>> {
     make_arg_vec![
         "-u --user=[user] 'User name for Delivery authentication'",
-        "-e --ent=[enterprise] 'The enterprise in which the project lives'",
+        "-e --ent=[ent] 'The enterprise in which the project lives'",
         "-o --org=[org] 'The organization in which the project lives'",
         "-s --server=[server] 'The Delivery server address'"]
 }
@@ -282,7 +282,7 @@ fn load_config(path: &PathBuf) -> Result<Config, DeliveryError> {
 fn clap_setup(matches: &ArgMatches) -> Result<(), DeliveryError> {
     let user = value_of(&matches, "user");
     let server = value_of(&matches, "server");
-    let ent = value_of(&matches, "enterprise");
+    let ent = value_of(&matches, "ent");
     let org = value_of(&matches, "org");
     let path = value_of(&matches, "dir");
     let pipeline = value_of(&matches, "pipeline");
@@ -310,7 +310,7 @@ fn setup(user: &str, server: &str, ent: &str,
 fn clap_init(matches: &ArgMatches) -> Result<(), DeliveryError> {
     let user = value_of(&matches, "user");
     let server = value_of(&matches, "server");
-    let ent = value_of(&matches, "enterprise");
+    let ent = value_of(&matches, "ent");
     let org = value_of(&matches, "org");
     let proj = value_of(&matches, "project");
     let no_open = matches.is_present("no-open");
@@ -495,7 +495,7 @@ fn clap_clone(matches: &ArgMatches) -> Result<(), DeliveryError> {
     let project = matches.value_of("project").unwrap();
     let user = value_of(&matches, "user");
     let server = value_of(&matches, "server");
-    let ent = value_of(&matches, "enterprise");
+    let ent = value_of(&matches, "ent");
     let org = value_of(&matches, "org");
     let git_url = value_of(&matches, "url");
     clone(project, user, server, ent, org, git_url)
@@ -532,12 +532,12 @@ fn clap_job(matches: &ArgMatches) -> Result<(), DeliveryError> {
 
     let change = value_of(&matches, "change");
     let pipeline = value_of(&matches, "pipeline");
-    let job_root = value_of(&matches, "root");
+    let job_root = value_of(&matches, "job-root");
     let proj = value_of(&matches, "project");
 
     let user = value_of(&matches, "user");
     let server = value_of(&matches, "server");
-    let ent = value_of(&matches, "enterprise");
+    let ent = value_of(&matches, "ent");
     let org = value_of(&matches, "org");
 
     let patchset = value_of(&matches, "patchset");
@@ -793,7 +793,7 @@ fn with_default<'a>(val: &'a str, default: &'a str, local: &bool) -> &'a str {
 fn clap_token(matches: &ArgMatches) -> Result<(), DeliveryError> {
     let server = value_of(&matches, "server");
     let port = value_of(&matches, "port");
-    let ent = value_of(&matches, "enterprise");
+    let ent = value_of(&matches, "ent");
     let user = value_of(&matches, "user");
     let verify = matches.is_present("verify");
     sayln("green", "Chef Delivery");
@@ -827,7 +827,7 @@ fn clap_api_req(matches: &ArgMatches) -> Result<(), DeliveryError> {
 
     let server = value_of(&matches, "server");
     let api_port = value_of(&matches, "port");
-    let ent = value_of(&matches, "enterprise");
+    let ent = value_of(&matches, "ent");
     let user = value_of(&matches, "user");
     api_req(method, path, data, server, api_port, ent, user)
 }
