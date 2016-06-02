@@ -112,7 +112,7 @@ pub fn create_on_server(config: &Config,
         return Ok(())
     }
     let path = try!(root_dir(&utils::cwd()));
-    try!(git::init_repo(&path));
+    try!(git::check_repo_init(&path));
     let client = try!(APIClient::from_config(config));
 
     match scp {
@@ -171,10 +171,7 @@ fn push_project_content_to_delivery(config: &Config, path: &PathBuf) -> Result<(
     if try!(git::config_repo(&url, path)) {
         sayln("white", "Remote 'delivery' added to git config!");
     } else {
-        sayln("red", "Remote named 'delivery' already exists - not modifying");
-        // We should verify that the remote is the correct one
-        // if not, delete it and create the right one.
-        // Or fail saying that it doesn't match
+        sayln("white", "Remote named 'delivery' already exists and is correct - not modifying");
     }
     say("white", "Checking for content on the git remote ");
     say("magenta", "delivery: ");

@@ -34,6 +34,14 @@ Scenario: When creating a delivery backed project and
   And the change has the default generated build_cookbook
   And the exit status should be 0
 
+Scenario: When creating a delivery backed project but
+	  the delivery remote is different.
+  When I successfully run `git init`
+  When I successfully run `git remote add delivery fake`
+  When I run `delivery init`
+  Then the output should contain "A git remote named delivery already exists in this repo, but it is different than what was contained in your config file"
+  And the exit status should be 1
+
 Scenario: When creating a delivery backed project
   When a user creates a delivery backed project
   Then a delivery project is created in delivery

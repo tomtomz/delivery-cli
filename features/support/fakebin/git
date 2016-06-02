@@ -17,6 +17,7 @@ case "$command" in
         repo_dir=$3
         mkdir -p $repo_dir
         cd $repo_dir
+	 $DELIVERY_SYSTEM_GIT init
         mkdir .delivery
         echo '{
     "version": "2",
@@ -42,6 +43,12 @@ case "$command" in
   "branch" )
       # Let's pretend we're on the foo branch.
       echo "* $FAKE_BRANCH"
+      ;;
+  "remote" )
+      $DELIVERY_SYSTEM_GIT $*
+      ;;
+  "init" )
+      $DELIVERY_SYSTEM_GIT $*
       ;;
   * )
       ;;
