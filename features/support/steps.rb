@@ -220,6 +220,11 @@ Given(/^the change has the default generated build_cookbook$/) do
   step %(a directory named ".delivery/build-cookbook" should exist)
 end
 
+Given(/^the change does not have the default generated build_cookbook$/) do
+  step %("git commit -m Adds Delivery build cookbook" should not be run)
+  step %("chef generate cookbook .delivery/build-cookbook" should not be run)
+end
+
 Given(/^a user creates a delivery backed project with option "([^"]*)"$/) do |option|
   step %(I checkout the "add-delivery-config" branch)
   step %(I successfully run `delivery init #{option}`)

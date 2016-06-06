@@ -428,9 +428,16 @@ fn generate_build_cookbook(skip_build_cookbook: &bool,
             try!(custom_build_cookbook_generator(&gen_path, &generator_path));
         },
         None => {
-            generator_path.push("pcb");
-            try!(git_clone_build_cookbook_generator(&generator_path.to_string_lossy(),
-                                                    "https://github.com/chef-cookbooks/pcb.git"));
+            let project_path = try!(root_dir(&utils::cwd()));
+            let path = project_path.join(".delivery/build-cookbook");
+            if path.exists() {
+                sayln("red", ".delivery/build-cookbook folder already exists, skipping build cookbook generation.");
+                return Ok(());
+            } else {
+                generator_path.push("pcb");
+                try!(git_clone_build_cookbook_generator(&generator_path.to_string_lossy(),
+                                                        "https://github.com/chef-cookbooks/pcb.git"));
+            }
         }
     };
     try!(chef_generate_build_cookbook(&generator_path));

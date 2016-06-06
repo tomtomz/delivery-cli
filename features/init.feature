@@ -49,6 +49,15 @@ Scenario: When creating a delivery backed project
   And the change has the default generated build_cookbook
   And the exit status should be 0
 
+Scenario: When creating a delivery backed project that already has a .delivery directory
+  When I successfully run `mkdir .delivery/build-cookbook`
+  When a user creates a delivery backed project
+  Then a delivery project is created in delivery
+  And a change configuring delivery is created
+  And the change does not have the default generated build_cookbook
+  And the output should contain ".delivery/build-cookbook folder already exists, skipping build cookbook generation."
+  And the exit status should be 0
+
 Scenario: When creating a bitbucket backed project
   When a user creates a bitbucket backed project
   Then a bitbucket project is created in delivery
