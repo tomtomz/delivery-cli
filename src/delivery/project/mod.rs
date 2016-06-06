@@ -340,9 +340,26 @@ fn create_feature_branch(project_path: &PathBuf) -> Result<(), DeliveryError> {
     say("white", "Creating and checking out ");
     say("yellow", "add-delivery-config");
     say("white", " feature branch: ");
-    try!(git::git_command(&["checkout", "-b", "add-delivery-config"], project_path));
-    sayln("green", "done");
-    Ok(())
+    match git::git_command(&["checkout", "-b", "add-delivery-config"], project_path) {
+        Ok(_) => {
+            sayln("green", "done");
+            return Ok(());
+        },
+        Err(e) => {
+            match e.detail.clone() {
+                Some(msg) => {
+                    if msg.contains("A branch named 'add-delivery-config' already exists") {
+                        say("white", "A branch named 'add-delivery-config' already exists, switching to it.\n");
+                        try!(git::git_command(&["checkout", "add-delivery-config"], project_path));
+                        return Ok(());
+                    } else {
+                        return Err(e)
+                    }
+                },
+                None => return Err(e)
+            }
+        }
+    }
 }
 
 /// Add and commit the generated build-cookbook
