@@ -322,7 +322,29 @@ fn trigger_review(config: Config, scp: Option<SourceCodeProvider>,
                 Type::Github => {
                     // For now, delivery review doesn't works for Github projects
                     // TODO: Make it work in github
-                    sayln("green", "Push add-delivery-config branch and create Pull Request");
+                    sayln("green", "\nYour project is now set up with changes in the add-delivery-config branch!");
+                    sayln("green", "To finalize your project, you must submit and accept a Pull Request in github.");
+
+                    // Check to see if the origin remote is set up, and if not, output something useful.
+                    let dir = try!(root_dir(&utils::cwd()));
+                    let git_remote_result = git::git_command(&["remote"], &dir);
+                    match git_remote_result {
+                        Ok(git_result) => {
+                            if !(git_result.stdout.contains("origin")) {
+                                sayln("green", "First, you must add your remote.");
+                                sayln("green", "Run this if you want to use ssh:\n");
+                                sayln("green", &format!("git remote add origin git@github.com:{}/{}.git\n", s.organization, s.repo_name));
+                                sayln("green", "Or this for https:\n");
+                                sayln("green", &format!("git remote add origin https://github.com/{}/{}.git\n", s.organization, s.repo_name));
+                            }
+                            true
+                        },
+                        Err(_) => false
+                    };
+
+                    sayln("green", "Push your project to github by running:\n");
+                    sayln("green", "git push origin add-delivery-config\n");
+                    sayln("green", "Then log into github via your browser, make a Pull Request, then comment `@delivery approve`.");
                 }
             }
         },

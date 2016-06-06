@@ -90,6 +90,19 @@ Scenario: When creating a github backed project
   Then a github project is created in delivery
   And a change configuring delivery is created
   And the change has the default generated build_cookbook
+  And the output should contain "git push origin add-delivery-config"
+  And the output should contain "git remote add"
+  And the exit status should be 0
+
+Scenario: When creating a github backed project with an initial origin remote set
+  When I successfully run `git init`
+  When I successfully run `git remote add origin fake`
+  When a user creates a github backed project
+  Then a github project is created in delivery
+  And a change configuring delivery is created
+  And the change has the default generated build_cookbook
+  And the output should contain "git push origin add-delivery-config"
+  And the output should not contain "git remote add"
   And the exit status should be 0
 
 Scenario: When trying to specify both github and bitbucket
