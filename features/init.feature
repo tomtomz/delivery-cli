@@ -49,13 +49,33 @@ Scenario: When creating a delivery backed project
   And the change has the default generated build_cookbook
   And the exit status should be 0
 
-Scenario: When creating a delivery backed project that already has a .delivery directory
+Scenario: When creating a delivery backed project that already has a .delivery/build-cookbook directory
   When I successfully run `mkdir .delivery/build-cookbook`
   When a user creates a delivery backed project
   Then a delivery project is created in delivery
   And a change configuring delivery is created
   And the change does not have the default generated build_cookbook
   And the output should contain ".delivery/build-cookbook folder already exists, skipping build cookbook generation."
+  And the exit status should be 0
+
+Scenario: When creating a delivery backed project that already has a .delivery/config.json directory and no custom config is requested
+  Given a file named ".delivery/config.json" with:
+  """
+  {
+    "version": "2",
+    "build_cookbook": {
+      "path": ".delivery/build-cookbook",
+      "name": "build-cookbook"
+    },
+    "skip_phases": [],
+    "build_nodes": {},
+    "dependencies": []
+  }
+  """
+  When a user creates a delivery backed project
+  Then a delivery project is created in delivery
+  And a change to the delivery config is not comitted
+  And the change has the default generated build_cookbook
   And the exit status should be 0
 
 Scenario: When creating a bitbucket backed project

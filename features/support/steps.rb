@@ -202,6 +202,10 @@ Given(/^a change configuring delivery is created$/) do
   step %(the file ".delivery/config.json" should contain:), %("dependencies": [])
 end
 
+Given(/^a change to the delivery config is not comitted$/) do
+  step %("git commit -m Adds Delivery config" should not be run)
+end
+
 Given(/^a user creates a project with a custom config\.json$/) do
   step %(a file named "../my_custom_config.json" with:), custom_config
   step %(I checkout the "add-delivery-config" branch)
