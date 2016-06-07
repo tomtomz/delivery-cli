@@ -112,7 +112,6 @@ pub fn create_on_server(config: &Config,
         return Ok(())
     }
     let path = try!(root_dir(&utils::cwd()));
-    try!(git::check_repo_init(&path));
     let client = try!(APIClient::from_config(config));
 
     match scp {
@@ -517,4 +516,3 @@ mod tests {
         }
     }
 }
-
