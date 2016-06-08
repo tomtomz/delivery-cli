@@ -387,7 +387,9 @@ fn create_feature_branch(project_path: &PathBuf) -> Result<(), DeliveryError> {
 fn add_commit_build_cookbook() -> Result<(), DeliveryError> {
     let project_path = try!(root_dir(&utils::cwd()));
     say("white", "Adding and commiting build-cookbook: ");
-    try!(git::git_command(&["add", ".delivery/build-cookbook"], &project_path));
+    // .delivery is probably not yet under version control, so we have to add
+    // the whole folder instead of .delivery/build-cookbook.
+    try!(git::git_command(&["add", ".delivery"], &project_path));
     try!(git::git_command(&["commit", "-m", "Adds Delivery build cookbook"], &project_path));
     sayln("green", "done");
     Ok(())

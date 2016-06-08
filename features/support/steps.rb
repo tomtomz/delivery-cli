@@ -19,12 +19,30 @@ def custom_config
 EOF
 end
 
+def basic_delivery_config
+<<EOF
+git_port = "8080"
+pipeline = "master"
+user = "dummy"
+server = "127.0.0.1:8080"
+enterprise = "dummy"
+organization = "dummy"
+EOF
+end
+
+def basic_git_config
+<<EOF
+[config]
+EOF
+end
+
 # Creates a new directory, "git init"s it and creates an empty commit
 # so we can have a branch
 Given(/^a git repo "(.*?)"$/) do |repo|
   step %(a directory named "#{repo}")
   dirs.push(repo)
   step %(I successfully run `git init --quiet`)
+  step %(I successfully run `git checkout -b master`)
   step %(I make a commit with message "Initial commit")
   dirs.pop
 end
@@ -46,6 +64,11 @@ Given(/^I have a feature branch "(.*)" off of "(.*)"$/) do |branch, base|
   })
   step %(I make a commit with message "Add tests first")
   step %(I make a commit with message "Add implementation")
+end
+
+Given(/^I set up basic delivery and git configs$/) do
+  step %(a file named ".delivery/cli.toml" with:), basic_delivery_config
+  step %(a file named ".git/config" with:), basic_git_config
 end
 
 # When in a git repository, checks out the given branch. The branch
@@ -147,17 +170,14 @@ Given(/^a dummy Delivery API server/) do
 end
 
 Given(/^a user creates a delivery backed project$/) do
-  step %(I checkout the "add-delivery-config" branch)
   step %(I successfully run `delivery init`)
 end
 
 Given(/^a user creates a github backed project$/) do
-  step %(I checkout the "add-delivery-config" branch)
   step %(I successfully run `delivery init --github chef --repo-name delivery-cli-init`)
 end
 
 Given(/^a user creates a bitbucket backed project$/) do
-  step %(I checkout the "add-delivery-config" branch)
   step %(I successfully run `delivery init --bitbucket chef --repo-name delivery-cli-init`)
 end
 
@@ -208,7 +228,6 @@ end
 
 Given(/^a user creates a project with a custom config\.json$/) do
   step %(a file named "../my_custom_config.json" with:), custom_config
-  step %(I checkout the "add-delivery-config" branch)
   step %(I successfully run `delivery init -c ../my_custom_config.json`)
 end
 
@@ -230,7 +249,6 @@ Given(/^the change does not have the default generated build_cookbook$/) do
 end
 
 Given(/^a user creates a delivery backed project with option "([^"]*)"$/) do |option|
-  step %(I checkout the "add-delivery-config" branch)
   step %(I successfully run `delivery init #{option}`)
 end
 

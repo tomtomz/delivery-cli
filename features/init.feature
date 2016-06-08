@@ -7,40 +7,7 @@ Background:
     """
   And a dummy Delivery API server
   And I am in the "delivery-cli-init" git repo
-  And a file named ".delivery/cli.toml" with:
-    """
-      git_port = "8080"
-      pipeline = "master"
-      user = "dummy"
-      server = "127.0.0.1:8080"
-      enterprise = "dummy"
-      organization = "dummy"
-    """
-  And a file named ".git/config" with:
-    """
-    [config]
-    """
-
-Scenario: When creating a delivery backed project and
-	  the project already exist on the server
-  When I am in the "already-created" git repo
-  And a file named ".git/config" with:
-    """
-    [config]
-    """
-  And a user creates a delivery backed project
-  Then a delivery project should not be created in delivery
-  And a change configuring delivery is created
-  And the change has the default generated build_cookbook
-  And the exit status should be 0
-
-Scenario: When creating a delivery backed project but
-	  the delivery remote is different.
-  When I successfully run `git init`
-  When I successfully run `git remote add delivery fake`
-  When I run `delivery init`
-  Then the output should contain "A git remote named delivery already exists in this repo, but it is different than what was contained in your config file"
-  And the exit status should be 1
+  And I set up basic delivery and git configs
 
 Scenario: When creating a delivery backed project
   When a user creates a delivery backed project
@@ -48,6 +15,24 @@ Scenario: When creating a delivery backed project
   And a change configuring delivery is created
   And the change has the default generated build_cookbook
   And the exit status should be 0
+
+Scenario: When creating a delivery backed project and
+	  the project already exists on the server
+  When I cd to ".."
+  When I am in the "already-created" git repo
+  When I set up basic delivery and git configs
+  Then I run `delivery init`
+  Then a delivery project should not be created in delivery
+  And a change configuring delivery is created
+  And the change has the default generated build_cookbook
+  And the exit status should be 0
+
+Scenario: When creating a delivery backed project but
+	  the delivery remote is different.
+  When I successfully run `git remote add delivery fake`
+  Then I run `delivery init`
+  Then the output should contain "A git remote named 'delivery' already exists in this repo, but it is different than what was contained in your config file"
+  And the exit status should be 1
 
 Scenario: When creating a delivery backed project that already has a .delivery/build-cookbook directory
   When I successfully run `mkdir .delivery/build-cookbook`
@@ -57,6 +42,13 @@ Scenario: When creating a delivery backed project that already has a .delivery/b
   And the change does not have the default generated build_cookbook
   And the output should contain ".delivery/build-cookbook folder already exists, skipping build cookbook generation."
   And the exit status should be 0
+
+Scenario: When creating a delivery backed project that has been git initalized but does not have a master branch
+  When I successfully run `rm -rf .git`
+  When I successfully run `git init`
+  When I run `delivery init`
+  And the output should contain "A master branch does not exist locally."
+  And the exit status should be 1
 
 Scenario: When creating a delivery backed project that already has a .delivery/config.json directory and no custom config is requested
   Given a file named ".delivery/config.json" with:
