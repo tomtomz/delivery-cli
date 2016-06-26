@@ -26,6 +26,7 @@ use git;
 use cli;
 use config::Config;
 use std::process::Output;
+use std::fs;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
@@ -148,8 +149,8 @@ fn create_delivery_pipeline(client: &APIClient, config: &Config) -> Result<(), D
 /// Create a Delivery Project with Delivery as SCP (default)
 fn create_delivery_project(client: &APIClient,
                            config: &Config) -> Result<(), DeliveryError> {
-    let org = try!(config.organization());
-    let proj = try!(config.project());
+    let org = config.organization().unwrap();
+    let proj = config.project().unwrap();
     if client.project_exists(&org, &proj) {
         say("white", "Project ");
         say("magenta", &format!("{} ", proj));
@@ -380,10 +381,11 @@ pub fn add_commit_build_cookbook(custom_config_passed: &bool) -> Result<(), Deli
     Ok(())
 }
 
-pub fn create_dot_delivery() -> Result<(), DeliveryError> {
+pub fn create_dot_delivery() -> &'static Path {
     let dot_delivery = Path::new(".delivery");
-    try!(mkdir_recursive(dot_delivery));
-    Ok(())
+    // Not expecting errors, no need to handle them.
+    fs::create_dir_all(dot_delivery).unwrap();
+    dot_delivery
 }
 
 /// Clone a build-cookbook generator if it doesn't exist already on the cache

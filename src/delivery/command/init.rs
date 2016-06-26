@@ -68,11 +68,10 @@ pub fn run(init_opts: InitClapOptions) -> i32 {
 pub fn init(config: Config, no_open: &bool, skip_build_cookbook: &bool,
             local: &bool, scp: Option<project::SourceCodeProvider>) -> i32 {
     let project_path = project::root_dir(&utils::cwd()).unwrap();
-    project::create_dot_delivery().unwrap();
+    project::create_dot_delivery();
     project::create_on_server(&config, scp.clone(), local).unwrap();
 
     // If non-custom generator used, then build cookbook is already merged to master.
-    //
     let custom_build_cookbook_generated = match project::generate_build_cookbook(skip_build_cookbook, config.generator().ok()).unwrap() {
         Some(boolean) => {
             match boolean {
