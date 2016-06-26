@@ -1,5 +1,5 @@
 // Takes in fully parsed and defaulted init clap args,
-// executes init code, handles errors, as well as UI output.
+// executes init codeflow, handles user actionable errors, as well as UI output.
 //
 // Returns an integer exit code, handling all errors it knows how to
 // and panicing on unexpected errors.
@@ -9,6 +9,10 @@ use cli::init::InitClapOptions;
 // TODO delete
 use cli::load_config;
 use config::Config;
+
+// TODO delete more
+use std::path::{Path, PathBuf};
+use errors::{DeliveryError, Kind};
 
 use project;
 use git;
@@ -65,6 +69,45 @@ pub fn run(init_opts: InitClapOptions) -> i32 {
     return init(config, &init_opts.no_open, &init_opts.skip_build_cookbook, &init_opts.local, scp);
 }
 
+/// Handles the build-cookbook generation
+///
+/// This method could receive a custom generator, if it is not provided,
+/// we use the default build-cookbook generator from the ChefDK.
+///
+/// Returns true if a CUSTOM build cookbook was generated, else false if something went wrong.
+fn generate_build_cookbook(generator: Option<String>) -> Option<bool> {
+    sayln("white", "Generating build cookbook skeleton");
+    let cache_path = project::generator_cache_path().unwrap();
+    let project_path = project::root_dir(&utils::cwd()).unwrap();
+    match generator {
+        Some(generator_str) => {
+            let gen_path = Path::new(&generator_str);
+            let mut generator_path = cache_path.clone();
+            generator_path.push(gen_path.file_stem().unwrap());
+            project::custom_build_cookbook_generator(&gen_path, &cache_path).unwrap();
+            project::chef_generate_build_cookbook_from_generator(&generator_path, &project_path).unwrap();
+            let config_path = project_path.join(".delivery/config.json");
+            if !(config_path.exists()) {
+                sayln("red", "You used a custom build cookbook generator, but .delivery/config.json was not created.");
+                sayln("red", "Please update your generator to create a valid .delivery/config.json or pass in a custom config.");
+                return None;
+            }
+            return Some(true)
+        },
+        None => {
+            if project::project_path().join(".delivery/build-cookbook").exists() {
+                sayln("red", ".delivery/build-cookbook folder already exists, skipping build cookbook generation.");
+                return Some(false)
+            } else {
+                let gen = project::create_default_build_cookbook();
+                git::git_push_master().unwrap();
+                sayln("green", &format!("Build-cookbook generated: {:#?}", gen));
+                return Some(false)
+            }
+        }
+    };
+}
+
 pub fn init(config: Config, no_open: &bool, skip_build_cookbook: &bool,
             local: &bool, scp: Option<project::SourceCodeProvider>) -> i32 {
     let project_path = project::root_dir(&utils::cwd()).unwrap();
@@ -72,25 +115,13 @@ pub fn init(config: Config, no_open: &bool, skip_build_cookbook: &bool,
     project::create_on_server(&config, scp.clone(), local).unwrap();
 
     // If non-custom generator used, then build cookbook is already merged to master.
-    let custom_build_cookbook_generated = match project::generate_build_cookbook(skip_build_cookbook, config.generator().ok()).unwrap() {
-        Some(boolean) => {
-            match boolean {
-                // Custom build cookbook was generated
-                true => {
-                    true
-                },
-                // Custom build cookbook was not generated, but we need to push
-                // master since `chef generate build-cookbook` merged to it.
-                false => {
-                    // TODO: Update when fixing --for for the init command.
-                    git::git_push_master().unwrap();
-                    false
-                }
-            }
-        },
-        // No build cookbook was generated, do nothing.
-        None => false
-    };
+    let mut custom_build_cookbook_generated = false;
+    if !(*skip_build_cookbook) {
+        custom_build_cookbook_generated = match generate_build_cookbook(config.generator().ok()) {
+            Some(boolean) => boolean,
+            None => return 1
+        }
+    }
 
     let custom_config_passed = project::generate_custom_delivery_config(config.config_json().ok()).unwrap();
 
