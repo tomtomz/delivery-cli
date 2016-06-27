@@ -44,9 +44,9 @@ pub struct SourceCodeProvider {
 }
 
 impl SourceCodeProvider {
-    /// Create a new `SourceCodeProvider`. Returns an error result if
-    /// required configuration values are missing. Expects to find
-    /// `scp`, `repository`, `scp-organization`, `branch`, and `ssl`.
+    // Create a new `SourceCodeProvider`. Returns an error result if
+    // required configuration values are missing. Expects to find
+    // `scp`, `repository`, `scp-organization`, `branch`, and `ssl`.
     pub fn new(scp: &str, repo: &str, org: &str, branch: &str,
                no_ssl: bool) -> Result<SourceCodeProvider, DeliveryError> {
         let scp_kind = match scp {
@@ -83,7 +83,7 @@ impl SourceCodeProvider {
         })
     }
 
-    /// Verify if the SCP is configured on the Delivery Server
+    // Verify if the SCP is configured on the Delivery Server
     pub fn verify_server_config(&self, client: &APIClient) -> Result<(), DeliveryError> {
         match self.kind {
             Type::Github => {
@@ -162,34 +162,34 @@ pub fn check_github_remote(s: &SourceCodeProvider) -> bool {
     }
 }
 
-/// Search for the project root directory
-///
-/// We will walk through the provided path tree until we find the
-/// git config (`.git/config`) annd then we will extract the root
-/// directory.
-///
-/// # Examples
-///
-/// Having this directory tree:
-/// /delivery-cli
-///  ├── .git
-///  │   └── config
-///  ├── src
-///  │   └── delivery
-///  └── features
-///
-/// ```
-/// use std::env;
-/// use delivery::project::root_dir;
-///
-/// let root = env::current_dir().unwrap();
-///
-/// // Stepping into `delivery-cli/src/delivery`
-/// let mut delivery_src = env::current_dir().unwrap();
-/// delivery_src.push("src/delivery");
-///
-/// assert_eq!(root, root_dir(&delivery_src.as_path()).unwrap());
-/// ```
+// Search for the project root directory
+//
+// We will walk through the provided path tree until we find the
+// git config (`.git/config`) annd then we will extract the root
+// directory.
+//
+// # Examples
+//
+// Having this directory tree:
+// /delivery-cli
+//  ├── .git
+//  │   └── config
+//  ├── src
+//  │   └── delivery
+//  └── features
+//
+// ```
+// use std::env;
+// use delivery::project::root_dir;
+//
+// let root = env::current_dir().unwrap();
+//
+// // Stepping into `delivery-cli/src/delivery`
+// let mut delivery_src = env::current_dir().unwrap();
+// delivery_src.push("src/delivery");
+//
+// assert_eq!(root, root_dir(&delivery_src.as_path()).unwrap());
+// ```
 pub fn root_dir(dir: &Path) -> Result<PathBuf, DeliveryError> {
     match walk_tree_for_path(&PathBuf::from(&dir), ".git/config") {
         Some(p) => {
@@ -208,13 +208,13 @@ pub fn project_path() -> PathBuf {
     root_dir(&utils::cwd()).unwrap()
 }
 
-/// Return the project name from the current path
+// Return the project name from the current path
 pub fn project_from_cwd() -> Result<String, DeliveryError> {
     let cwd = try!(self::root_dir(&utils::cwd()));
     Ok(cwd.file_name().unwrap().to_str().unwrap().to_string())
 }
 
-/// Return the project name or try to extract it from the current path
+// Return the project name or try to extract it from the current path
 pub fn project_or_from_cwd(proj: &str) -> Result<String, DeliveryError> {
     if proj.is_empty() {
         project_from_cwd()
@@ -223,9 +223,9 @@ pub fn project_or_from_cwd(proj: &str) -> Result<String, DeliveryError> {
     }
 }
 
-/// Handle custom delivery config generation
-///
-/// Receives a custom config.json file that will be copy to the current project repo
+// Handle custom delivery config generation
+//
+// Receives a custom config.json file that will be copy to the current project repo
 // pub fn generate_custom_delivery_config(config_json: Option<String>) -> bool {
 //     if let Some(json) = config_json {
 //         let json_path = PathBuf::from(json);
@@ -236,11 +236,11 @@ pub fn project_or_from_cwd(proj: &str) -> Result<String, DeliveryError> {
 //     }
 // }
 
-/// Create the feature branch `add-delivery-config`
-///
-/// This branch is created to start modifying the project repository
-/// In the case of a failure, we could roll back fearly easy by checking
-/// out master and deleting this feature branch.
+// Create the feature branch `add-delivery-config`
+//
+// This branch is created to start modifying the project repository
+// In the case of a failure, we could roll back fearly easy by checking
+// out master and deleting this feature branch.
 //
 // If feature branch created, return true, else return false.
 pub fn create_feature_branch_if_missing(project_path: &PathBuf) -> bool {
@@ -266,7 +266,7 @@ pub fn create_feature_branch_if_missing(project_path: &PathBuf) -> bool {
     }
 }
 
-/// Add and commit the generated build-cookbook
+// Add and commit the generated build-cookbook
 pub fn add_commit_build_cookbook(custom_config_passed: &bool) -> () {
     // .delivery is probably not yet under version control, so we have to add
     // the whole folder instead of .delivery/build-cookbook.
@@ -303,12 +303,12 @@ pub enum CustomCookbookSource {
     Git
 }
 
-/// Custom build-cookbook generation
-///
-/// This method handles a custom generator which could be:
-/// 1) A local path
-/// 2) Or a git repo URL
-/// TODO) From Supermarket
+// Custom build-cookbook generation
+//
+// This method handles a custom generator which could be:
+// 1) A local path
+// 2) Or a git repo URL
+// TODO) From Supermarket
 pub fn download_or_mv_custom_build_cookbook_generator(generator: &Path, cache_path: &Path) -> CustomCookbookSource {
     mkdir_recursive(cache_path).unwrap();
     if generator.has_root() {
@@ -326,7 +326,7 @@ pub fn download_or_mv_custom_build_cookbook_generator(generator: &Path, cache_pa
     }
 }
 
-/// Generate the build-cookbook using ChefDK generate
+// Generate the build-cookbook using ChefDK generate
 pub fn chef_generate_build_cookbook_from_generator(generator: &Path, cache_path: &Path, project_path: &Path) -> Command {
     let mut gen = utils::make_command("chef");
     gen.arg("generate")
@@ -338,7 +338,7 @@ pub fn chef_generate_build_cookbook_from_generator(generator: &Path, cache_path:
     gen
 }
 
-/// Default cookbooks generator cache path
+// Default cookbooks generator cache path
 pub fn generator_cache_path() -> Result<PathBuf, DeliveryError> {
     utils::home_dir(&[".delivery/cache/generator-cookbooks"])
 }
