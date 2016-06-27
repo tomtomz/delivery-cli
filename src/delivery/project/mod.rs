@@ -103,32 +103,8 @@ impl SourceCodeProvider {
     }
 }
 
-/// Create a Delivery Project
-///
-/// This method will create a Delivery Project depending on the SCP that we specify,
-/// either a Github, Bitbucket or Delivery (default). It also creates a pipeline,
-/// adds the `delivery` remote and push the content of the local repo to the Server.
-pub fn create_on_server(config: &Config,
-              scp: Option<SourceCodeProvider>, local: &bool) -> Result<(), DeliveryError> {
-    if *local {
-        return Ok(())
-    }
-    let path = try!(root_dir(&utils::cwd()));
-    let client = try!(APIClient::from_config(config));
-
-    match scp {
-        Some(scp_config) => try!(create_scp_project(client, config, &path, scp_config)),
-        None => {
-            try!(create_delivery_project(&client, config));
-            try!(push_project_content_to_delivery(config, &path));
-            try!(create_delivery_pipeline(&client, config));
-        }
-    }
-    Ok(())
-}
-
 /// Create a Delivery Pipeline
-fn create_delivery_pipeline(client: &APIClient, config: &Config) -> Result<(), DeliveryError> {
+pub fn create_delivery_pipeline(client: &APIClient, config: &Config) -> Result<(), DeliveryError> {
     let org = try!(config.organization());
     let proj = try!(config.project());
     let pipe = try!(config.pipeline());
@@ -147,7 +123,7 @@ fn create_delivery_pipeline(client: &APIClient, config: &Config) -> Result<(), D
 }
 
 /// Create a Delivery Project with Delivery as SCP (default)
-fn create_delivery_project(client: &APIClient,
+pub fn create_delivery_project(client: &APIClient,
                            config: &Config) -> Result<(), DeliveryError> {
     let org = config.organization().unwrap();
     let proj = config.project().unwrap();
@@ -167,7 +143,7 @@ fn create_delivery_project(client: &APIClient,
 
 /// Add the `delivery` remote to the local git reposiory and
 /// then push local content to the Delivery Server
-fn push_project_content_to_delivery(config: &Config, path: &PathBuf) -> Result<(), DeliveryError> {
+pub fn push_project_content_to_delivery(config: &Config, path: &PathBuf) -> Result<(), DeliveryError> {
     let url = try!(config.delivery_git_ssh_url());
     if try!(git::config_repo(&url, path)) {
         sayln("white", "Remote 'delivery' added to git config!");
@@ -185,8 +161,22 @@ fn push_project_content_to_delivery(config: &Config, path: &PathBuf) -> Result<(
     }
 }
 
+// Check to see if the origin remote is set up.
+pub fn check_github_remote(s: &SourceCodeProvider) -> bool {
+    let git_remote_result = git::git_command(&["remote"], &project_path());
+    match git_remote_result {
+        Ok(git_result) => {
+            if !(git_result.stdout.contains("origin")) {
+                return false
+            }
+            return true
+        },
+        Err(e) => panic!(e) // Unexpected error, raise.
+    }
+}
+
 /// Create a Delivery Project with Bitbucket or Github as SCP
-fn create_scp_project(client: APIClient, config: &Config,
+pub fn create_scp_project(client: APIClient, config: &Config,
                       path: &PathBuf, scp: SourceCodeProvider) -> Result<(), DeliveryError> {
     let org = try!(config.organization());
     let proj = try!(config.project());
@@ -313,25 +303,6 @@ pub fn create_feature_branch_if_missing(project_path: &PathBuf) -> bool {
                 None => panic!(e)
             }
         }
-    }
-}
-
-// Check to see if the origin remote is set up, and if not, output something useful.
-pub fn check_github_remote(s: SourceCodeProvider) -> Result<bool, DeliveryError> {
-    let dir = try!(root_dir(&utils::cwd()));
-    let git_remote_result = git::git_command(&["remote"], &dir);
-    match git_remote_result {
-        Ok(git_result) => {
-            if !(git_result.stdout.contains("origin")) {
-                sayln("green", "First, you must add your remote.");
-                sayln("green", "Run this if you want to use ssh:\n");
-                sayln("green", &format!("git remote add origin git@github.com:{}/{}.git\n", s.organization, s.repo_name));
-                sayln("green", "Or this for https:\n");
-                sayln("green", &format!("git remote add origin https://github.com/{}/{}.git\n", s.organization, s.repo_name));
-            }
-            Ok(true)
-        },
-        Err(_) => Ok(false)
     }
 }
 

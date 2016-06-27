@@ -20,6 +20,7 @@ use project;
 use git;
 use utils;
 use utils::say::{sayln, say};
+use http::APIClient;
 
 /// Initialize a Delivery project
 ///
@@ -71,11 +72,14 @@ pub fn run(init_opts: InitClapOptions) -> i32 {
     return init(config, &init_opts.no_open, &init_opts.skip_build_cookbook, &init_opts.local, scp);
 }
     
-pub fn init(config: Config, no_open: &bool, skip_build_cookbook: &bool,
+fn init(config: Config, no_open: &bool, skip_build_cookbook: &bool,
             local: &bool, scp: Option<project::SourceCodeProvider>) -> i32 {
     let project_path = project::project_path();
     project::create_dot_delivery();
-    project::create_on_server(&config, scp.clone(), local).unwrap();
+
+    if !(local) {
+        create_on_server(&config, scp.clone()).unwrap()
+    }
 
     // Generate build cookbook, either custom or default.
     let mut custom_build_cookbook_generated = false;
@@ -111,7 +115,10 @@ pub fn init(config: Config, no_open: &bool, skip_build_cookbook: &bool,
     } else {
         if let Some(project_type) = scp {
             if project_type.kind == project::Type::Github {
-                let _ = check_github_remote(project_type);
+                if !(project::check_github_remote(&project_type)) {
+                    setup_github_remote_msg(&project_type)
+                }
+//                let _ = check_github_remote(project_type);
             }
         };
 
@@ -121,6 +128,27 @@ pub fn init(config: Config, no_open: &bool, skip_build_cookbook: &bool,
         //sayln("white", "delivery local lint");
     }
     return 0
+}
+
+/// Create a Delivery Project
+///
+/// This method will create a Delivery Project depending on the SCP that we specify,
+/// either a Github, Bitbucket or Delivery (default). It also creates a pipeline,
+/// adds the `delivery` remote and push the content of the local repo to the Server.
+fn create_on_server(config: &Config,
+              scp: Option<project::SourceCodeProvider>) -> Result<(), DeliveryError> {
+    let path = project::project_path();
+    let client = try!(APIClient::from_config(config));
+
+    match scp {
+        Some(scp_config) => try!(project::create_scp_project(client, config, &path, scp_config)),
+        None => {
+            try!(project::create_delivery_project(&client, config));
+            try!(project::push_project_content_to_delivery(config, &path));
+            try!(project::create_delivery_pipeline(&client, config));
+        }
+    }
+    Ok(())
 }
 
 // Handles the build-cookbook generation
@@ -222,7 +250,9 @@ fn trigger_review(config: Config, scp: Option<project::SourceCodeProvider>,
                     sayln("green", "\nYour project is now set up with changes in the add-delivery-config branch!");
                     sayln("green", "To finalize your project, you must submit and accept a Pull Request in github.");
 
-                    check_github_remote(s);
+                    if !(project::check_github_remote(&s)) {
+                        setup_github_remote_msg(&s)
+                    }
 
                     sayln("green", "Push your project to github by running:\n");
                     sayln("green", "git push origin add-delivery-config\n");
@@ -235,21 +265,10 @@ fn trigger_review(config: Config, scp: Option<project::SourceCodeProvider>,
     Ok(())
 }
 
-// Check to see if the origin remote is set up, and if not, output something useful.
-fn check_github_remote(s: project::SourceCodeProvider) -> bool {
-    let git_remote_result = git::git_command(&["remote"], &project::project_path());
-    match git_remote_result {
-        Ok(git_result) => {
-            if !(git_result.stdout.contains("origin")) {
-                sayln("green", "First, you must add your remote.");
-                sayln("green", "Run this if you want to use ssh:\n");
-                sayln("green", &format!("git remote add origin git@github.com:{}/{}.git\n", s.organization, s.repo_name));
-                sayln("green", "Or this for https:\n");
-                sayln("green", &format!("git remote add origin https://github.com/{}/{}.git\n", s.organization, s.repo_name));
-            }
-            true
-        },
-        Err(_) => false
-    }
+fn setup_github_remote_msg(s: &project::SourceCodeProvider) -> () {
+    sayln("green", "First, you must add your remote.");
+    sayln("green", "Run this if you want to use ssh:\n");
+    sayln("green", &format!("git remote add origin git@github.com:{}/{}.git\n", s.organization, s.repo_name));
+    sayln("green", "Or this for https:\n");
+    sayln("green", &format!("git remote add origin https://github.com/{}/{}.git\n", s.organization, s.repo_name));
 }
-
