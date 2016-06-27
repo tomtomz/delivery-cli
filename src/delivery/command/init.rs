@@ -153,14 +153,29 @@ fn create_on_server(config: &Config,
                     say("magenta", "bitbucket");
                     say("white", " project: ");
                     say("magenta", &format!("{} ", proj));
+                    // TODO: http code still outputs, move here.
                     try!(client.create_bitbucket_project(&org, &proj, &scp_config.repo_name,
                                                          &scp_config.organization, &scp_config.branch));
-                    try!(project::push_project_content_to_delivery(config, &path));
+                    // Setup delivery remote
+                    let git_url = config.delivery_git_ssh_url().unwrap();
+                    if project::create_delivery_remote_if_missing(git_url) {
+                        sayln("white", "Remote 'delivery' added to git config!")
+                    } else {
+                        sayln("white", "Remote named 'delivery' already exists and is correct - not modifying")
+                    }
+
+                    // Push content to master if no upstream commits
+                    say("white", "Checking for content on the git remote ");
+                    say("magenta", "delivery: ");
+                    if !(project::push_project_content_to_delivery()) {
+                        sayln("red", "Found commits upstream, not pushing local commits");
+                    }
                 },
                 project::Type::Github => {
                     say("magenta", "github");
                     say("white", " project: ");
                     say("magenta", &format!("{} ", proj));
+                    // TODO: http code still outputs, move here.
                     try!(client.create_github_project(&org, &proj, &scp_config.repo_name,
                                                       &scp_config.organization, &scp_config.branch, scp_config.verify_ssl));
                 }
@@ -168,9 +183,40 @@ fn create_on_server(config: &Config,
         },
         // If the user isn't using an scp, just delivery itself
         None => {
-            try!(project::create_delivery_project(&client, config));
-            try!(project::push_project_content_to_delivery(config, &path));
-            try!(project::create_delivery_pipeline(&client, config));
+            let org = config.organization().unwrap();
+            let proj = config.project().unwrap();
+            let pipe = config.pipeline().unwrap();
+
+            // Create delivery project on server unless it already exists.
+            if project::create_delivery_project(&client, &org, &proj) {
+                say("white", "Created ");
+                say("magenta", "delivery");
+                say("white", " project: ");
+                say("magenta", &format!("{} ", proj));
+            } else {
+                say("white", "Project ");
+                say("magenta", &format!("{} ", proj));
+                sayln("white", "already exists.")
+            }
+
+            // Push content to master if no upstream commits.
+            say("white", "Checking for content on the git remote ");
+            say("magenta", "delivery: ");
+            if !(project::push_project_content_to_delivery()) {
+                sayln("red", "Found commits upstream, not pushing local commits")
+            }
+
+            // Create delivery pipeline unless it already exists.
+            if project::create_delivery_pipeline(&client, &org, &proj, &pipe) {
+                say("white", "Created ");
+                say("magenta", &format!("{}", pipe));
+                say("white", " pipeline for project: ");
+                say("magenta", &format!("{}: ", proj))
+            } else {
+                say("white", "Pipeline ");
+                say("magenta", &format!("{} ", pipe));
+                sayln("white", "already exists.")
+            }
         }
     }
     Ok(())

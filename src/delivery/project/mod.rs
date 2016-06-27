@@ -103,61 +103,48 @@ impl SourceCodeProvider {
     }
 }
 
-/// Create a Delivery Pipeline
-pub fn create_delivery_pipeline(client: &APIClient, config: &Config) -> Result<(), DeliveryError> {
-    let org = try!(config.organization());
-    let proj = try!(config.project());
-    let pipe = try!(config.pipeline());
-    if client.pipeline_exists(&org, &proj, &pipe) {
-        say("white", "Pipeline ");
-        say("magenta", &format!("{} ", pipe));
-        sayln("white", "already exists.");
+// Create a Delivery Pipeline.
+// Returns true if created, returns false if already exists.
+pub fn create_delivery_pipeline(client: &APIClient, org: &String, proj: &String, pipe: &String) -> bool {
+    if client.pipeline_exists(org, proj, pipe) {
+        return false
     } else {
-        say("white", "Creating ");
-        say("magenta", &format!("{}", pipe));
-        say("white", " pipeline for project: ");
-        say("magenta", &format!("{}: ", proj));
-        try!(client.create_pipeline(&org, &proj, &pipe));
+        client.create_pipeline(org, proj, pipe).unwrap();
+        return true
     }
-    Ok(())
 }
 
-/// Create a Delivery Project with Delivery as SCP (default)
+// Create a Delivery Project with Delivery as SCP (default).
+// If the project is created, return true.
+// If the project already exists, return false
 pub fn create_delivery_project(client: &APIClient,
-                           config: &Config) -> Result<(), DeliveryError> {
-    let org = config.organization().unwrap();
-    let proj = config.project().unwrap();
-    if client.project_exists(&org, &proj) {
-        say("white", "Project ");
-        say("magenta", &format!("{} ", proj));
-        sayln("white", "already exists.");
+                               org: &String,
+                               proj: &String) -> bool {
+    if client.project_exists(org, proj) {
+        return false
     } else {
-        say("white", "Creating ");
-        say("magenta", "delivery");
-        say("white", " project: ");
-        say("magenta", &format!("{} ", proj));
-        try!(client.create_delivery_project(&org, &proj));
+        client.create_delivery_project(org, proj).unwrap();
+        return true
     }
-    Ok(())
 }
 
-/// Add the `delivery` remote to the local git reposiory and
-/// then push local content to the Delivery Server
-pub fn push_project_content_to_delivery(config: &Config, path: &PathBuf) -> Result<(), DeliveryError> {
-    let url = try!(config.delivery_git_ssh_url());
-    if try!(git::config_repo(&url, path)) {
-        sayln("white", "Remote 'delivery' added to git config!");
-    } else {
-        sayln("white", "Remote named 'delivery' already exists and is correct - not modifying");
-    }
-    say("white", "Checking for content on the git remote ");
-    say("magenta", "delivery: ");
+// Push local content to the Delivery Server if no upstream commits.
+// Returns true if commits pushed, returns false if upstream commits found.
+pub fn push_project_content_to_delivery() -> bool {
     if git::server_content() {
-        sayln("red", "Found commits upstream, not pushing local commits");
-        Ok(())
+        return false
     } else {
-        sayln("white", "Pushing local content to server:");
-        git::git_push_master()
+        git::git_push_master();
+        return true
+    }
+}
+
+// Create delivery remote if it doesn't exist. Returns true if created.
+pub fn create_delivery_remote_if_missing(delivery_git_ssh_url: String) -> bool {
+    if git::config_repo(&delivery_git_ssh_url, &project_path()).unwrap() {
+        return true
+    } else {
+        return false
     }
 }
 
@@ -173,33 +160,6 @@ pub fn check_github_remote(s: &SourceCodeProvider) -> bool {
         },
         Err(e) => panic!(e) // Unexpected error, raise.
     }
-}
-
-/// Create a Delivery Project with Bitbucket or Github as SCP
-pub fn create_scp_project(client: APIClient, config: &Config,
-                      path: &PathBuf, scp: SourceCodeProvider) -> Result<(), DeliveryError> {
-    let org = try!(config.organization());
-    let proj = try!(config.project());
-    try!(scp.verify_server_config(&client));
-    say("white", "Creating ");
-    match scp.kind {
-        Type::Bitbucket => {
-            say("magenta", "bitbucket");
-            say("white", " project: ");
-            say("magenta", &format!("{} ", proj));
-            try!(client.create_bitbucket_project(&org, &proj, &scp.repo_name,
-                                                 &scp.organization, &scp.branch));
-            try!(push_project_content_to_delivery(config, path));
-        },
-        Type::Github => {
-            say("magenta", "github");
-            say("white", " project: ");
-            say("magenta", &format!("{} ", proj));
-            try!(client.create_github_project(&org, &proj, &scp.repo_name,
-                                              &scp.organization, &scp.branch, scp.verify_ssl));
-        }
-    }
-    Ok(())
 }
 
 /// Search for the project root directory
