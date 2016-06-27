@@ -15,16 +15,12 @@
 // limitations under the License.
 //
 
-use utils::say::{say, sayln};
 use utils::{self, walk_tree_for_path, mkdir_recursive};
 use utils::path_ext::is_dir;
 use errors::{DeliveryError, Kind};
-use delivery_config::DeliveryConfig;
 use std::path::{Path, PathBuf};
 use http::APIClient;
 use git;
-use cli;
-use config::Config;
 use std::process::{Output, Command};
 use std::fs;
 
@@ -134,7 +130,8 @@ pub fn push_project_content_to_delivery() -> bool {
     if git::server_content() {
         return false
     } else {
-        git::git_push_master();
+        // TODO: move output up to init post --for bugfix.
+        git::git_push_master().unwrap();
         return true
     }
 }
@@ -149,7 +146,7 @@ pub fn create_delivery_remote_if_missing(delivery_git_ssh_url: String) -> bool {
 }
 
 // Check to see if the origin remote is set up.
-pub fn check_github_remote(s: &SourceCodeProvider) -> bool {
+pub fn check_github_remote() -> bool {
     let git_remote_result = git::git_command(&["remote"], &project_path());
     match git_remote_result {
         Ok(git_result) => {
@@ -195,7 +192,6 @@ pub fn root_dir(dir: &Path) -> Result<PathBuf, DeliveryError> {
         Some(p) => {
            let git_d = p.parent().unwrap();
            let root_d = git_d.parent().unwrap();
-           debug!("found project root dir: {:?}", root_d);
            Ok(PathBuf::from(root_d))
         },
         None => Err(DeliveryError{kind: Kind::NoGitConfig,
@@ -320,22 +316,22 @@ pub fn download_or_mv_custom_build_cookbook_generator(generator: &Path, cache_pa
         if is_dir(&cache_path) {
             return CustomCookbookSource::Cached
         } else {
-            git::clone(&cache_path_str, &generator_str);
+            git::clone(&cache_path_str, &generator_str).unwrap();
             return CustomCookbookSource::Git
         }
     }
 }
 
 // Generate the build-cookbook using ChefDK generate
-pub fn chef_generate_build_cookbook_from_generator(generator: &Path, cache_path: &Path, project_path: &Path) -> Command {
-    let mut gen = utils::make_command("chef");
-    gen.arg("generate")
+pub fn chef_generate_build_cookbook_from_generator(generator: &Path, project_path: &Path) -> Command {
+    let mut command = utils::make_command("chef");
+    command.arg("generate")
         .arg("cookbook")
         .arg(".delivery/build-cookbook")
         .arg("-g")
         .arg(generator)
         .current_dir(&project_path);
-    gen
+    command
 }
 
 // Default cookbooks generator cache path

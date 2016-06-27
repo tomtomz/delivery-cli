@@ -7,34 +7,15 @@
 use cli::init::InitClapOptions;
 use delivery_config::DeliveryConfig;
 use cli;
-
-// TODO delete
 use cli::load_config;
 use config::Config;
-
-// TODO delete more
 use std::path::{Path, PathBuf};
-use errors::{DeliveryError, Kind};
-
 use project;
 use git;
 use utils;
 use utils::say::{sayln, say};
 use http::APIClient;
 
-/// Initialize a Delivery project
-///
-/// This method will init a Delivery project doing the following:
-/// * Create the project in Delivery. (It knows how to link the project to a
-///   Github or Bitbucket SCP)
-/// * Add the `delivery` remote (Only Delivery & Bitbucket projects)
-/// * Push local content to Delivery (Only Delivery & Bitbucket projects)
-/// * Create a Pipeline
-/// * Create a feature branch called `add-delivery-config` to:
-///     * Create a build-cookbook
-///     * Create the `.delivery/config.json`
-/// * Finally submit a cli::review (Only for Delivery & Bitbucket projects)
-///
 pub fn run(init_opts: InitClapOptions) -> i32 {
     sayln("green", "Chef Delivery");
     let mut config = load_config(&utils::cwd()).unwrap();
@@ -69,16 +50,33 @@ pub fn run(init_opts: InitClapOptions) -> i32 {
         );
     }
 
+    // Returns integer exit status.
     return init(config, &init_opts.no_open, &init_opts.skip_build_cookbook, &init_opts.local, scp);
 }
-    
+
+// Once everything is validated, actually execute init.
+// Handles logic flow, output, and error handling.
+//
+// Initialize a Delivery project
+//
+// This method will init a Delivery project doing the following:
+// * Create the project in Delivery. (It knows how to link the project to a
+//   Github or Bitbucket SCP)
+// * Add the `delivery` remote (Only Delivery & Bitbucket projects)
+// * Push local content to Delivery (Only Delivery & Bitbucket projects)
+// * Create a Pipeline
+// * Create a feature branch called `add-delivery-config` to:
+//     * Create a build-cookbook
+//     * Create the `.delivery/config.json`
+// * Finally submit a cli::review (Only for Delivery & Bitbucket projects)
+//
 fn init(config: Config, no_open: &bool, skip_build_cookbook: &bool,
             local: &bool, scp: Option<project::SourceCodeProvider>) -> i32 {
     let project_path = project::project_path();
     project::create_dot_delivery();
 
     if !(local) {
-        create_on_server(&config, scp.clone()).unwrap()
+        create_on_server(&config, scp.clone())
     }
 
     // Generate build cookbook, either custom or default.
@@ -108,17 +106,16 @@ fn init(config: Config, no_open: &bool, skip_build_cookbook: &bool,
             sayln("green", "done");
         }
 
-        // Only trigger review if there were any custom commits to review.
+        // Trigger review if there were any custom commits to review.
         if !(local) {
-            trigger_review(config, scp, &no_open).unwrap()
+            trigger_review(config, scp, &no_open)
         }
     } else {
         if let Some(project_type) = scp {
             if project_type.kind == project::Type::Github {
-                if !(project::check_github_remote(&project_type)) {
+                if !(project::check_github_remote()) {
                     setup_github_remote_msg(&project_type)
                 }
-//                let _ = check_github_remote(project_type);
             }
         };
 
@@ -130,58 +127,44 @@ fn init(config: Config, no_open: &bool, skip_build_cookbook: &bool,
     return 0
 }
 
-/// Create a Delivery Project
-///
-/// This method will create a Delivery Project depending on the SCP that we specify,
-/// either a Github, Bitbucket or Delivery (default). It also creates a pipeline,
-/// adds the `delivery` remote and push the content of the local repo to the Server.
+// Create a Delivery Project
+//
+// This method will create a Delivery Project depending on the SCP that we specify,
+// either a Github, Bitbucket or Delivery (default). It also creates a pipeline,
+// adds the `delivery` remote and push the content of the local repo to the Server.
 fn create_on_server(config: &Config,
-              scp: Option<project::SourceCodeProvider>) -> Result<(), DeliveryError> {
-    let path = project::project_path();
-    let client = try!(APIClient::from_config(config));
-
+              scp: Option<project::SourceCodeProvider>) -> () {
+    let client = APIClient::from_config(config).unwrap();
     match scp {
         // If the user requested a custom scp
         Some(scp_config) => {
-            //try!(project::create_scp_project(client, config, &path, scp_config)),
-            let org = try!(config.organization());
-            let proj = try!(config.project());
-            try!(scp_config.verify_server_config(&client));
+            // TODO: actually handle this error
+            scp_config.verify_server_config(&client).unwrap();
+
+            let org = config.organization().unwrap();
+            let proj = config.project().unwrap();
+            let git_url = config.delivery_git_ssh_url().unwrap();
+
             say("white", "Creating ");
             match scp_config.kind {
                 project::Type::Bitbucket => {
                     say("magenta", "bitbucket");
                     say("white", " project: ");
                     say("magenta", &format!("{} ", proj));
-                    // TODO: http code still outputs, move here.
-                    try!(client.create_bitbucket_project(&org, &proj, &scp_config.repo_name,
-                                                         &scp_config.organization, &scp_config.branch));
-                    // Setup delivery remote
-                    let git_url = config.delivery_git_ssh_url().unwrap();
-                    if project::create_delivery_remote_if_missing(git_url) {
-                        sayln("white", "Remote 'delivery' added to git config!")
-                    } else {
-                        sayln("white", "Remote named 'delivery' already exists and is correct - not modifying")
-                    }
-
-                    // Push content to master if no upstream commits
-                    say("white", "Checking for content on the git remote ");
-                    say("magenta", "delivery: ");
-                    if !(project::push_project_content_to_delivery()) {
-                        sayln("red", "Found commits upstream, not pushing local commits");
-                    }
+                    create_bitbucket_project(org, proj, git_url, client, scp_config)
                 },
                 project::Type::Github => {
                     say("magenta", "github");
                     say("white", " project: ");
                     say("magenta", &format!("{} ", proj));
-                    // TODO: http code still outputs, move here.
-                    try!(client.create_github_project(&org, &proj, &scp_config.repo_name,
-                                                      &scp_config.organization, &scp_config.branch, scp_config.verify_ssl));
+                    // TODO: http code still outputs, move output here.
+                    client.create_github_project(&org, &proj, &scp_config.repo_name,
+                                                 &scp_config.organization, &scp_config.branch,
+                                                 scp_config.verify_ssl).unwrap();
                 }
             }
         },
-        // If the user isn't using an scp, just delivery itself
+        // If the user isn't using an scp, just delivery itself.
         None => {
             let org = config.organization().unwrap();
             let proj = config.project().unwrap();
@@ -219,50 +202,41 @@ fn create_on_server(config: &Config,
             }
         }
     }
-    Ok(())
+    ()
+}
+
+fn create_bitbucket_project(org: String, proj: String, git_url: String, client: APIClient, scp_config: project::SourceCodeProvider) -> () {
+    // TODO: http code still outputs, move output here.
+    client.create_bitbucket_project(&org, &proj, &scp_config.repo_name,
+                                    &scp_config.organization, &scp_config.branch).unwrap();
+    // Setup delivery remote
+    if project::create_delivery_remote_if_missing(git_url) {
+        sayln("white", "Remote 'delivery' added to git config!")
+    } else {
+        sayln("white", "Remote named 'delivery' already exists and is correct - not modifying")
+    }
+
+    // Push content to master if no upstream commits
+    say("white", "Checking for content on the git remote ");
+    say("magenta", "delivery: ");
+    if !(project::push_project_content_to_delivery()) {
+        sayln("red", "Found commits upstream, not pushing local commits");
+    }
 }
 
 // Handles the build-cookbook generation
-///
-/// This method could receive a custom generator, if it is not provided,
-/// we use the default build-cookbook generator from the ChefDK.
-///
-/// Returns true if a CUSTOM build cookbook was generated, else false if something went wrong.
+//
+// This method could receive a custom generator, if it is not provided,
+// we use the default build-cookbook generator from the ChefDK.
+//
+// Returns true if a CUSTOM build cookbook was generated, else false if something went wrong.
 fn generate_build_cookbook(generator: Option<String>) -> Option<bool> {
     sayln("white", "Generating build cookbook skeleton");
     let cache_path = project::generator_cache_path().unwrap();
     let project_path = project::root_dir(&utils::cwd()).unwrap();
     match generator {
-        // Custom build cookbook
         Some(generator_str) => {
-            let gen_path = Path::new(&generator_str);
-            let mut generator_path = cache_path.clone();
-            generator_path.push(gen_path.file_stem().unwrap());
-            match project::download_or_mv_custom_build_cookbook_generator(&gen_path, &cache_path) {
-                project::CustomCookbookSource::Disk => {
-                    say("white", "Copying custom build-cookbook generator to ");
-                    sayln("yellow", &format!("{:?}", &cache_path));
-                },
-                project::CustomCookbookSource::Cached => {
-                    sayln("yellow", &format!("Using cached copy of build-cookbook generator {:?}",
-                                             &cache_path));
-                },
-                project::CustomCookbookSource::Git => {
-                    say("white", "Downloading build-cookbook generator from ");
-                    sayln("yellow", &format!("{:?}", &generator_str));
-                }
-            }
-            
-            let command = project::chef_generate_build_cookbook_from_generator(&generator_path, &cache_path, &project_path);
-            sayln("green", &format!("Build-cookbook generated: {:#?}", command));
-
-            let config_path = project_path.join(".delivery/config.json");
-            if !(config_path.exists()) {
-                sayln("red", "You used a custom build cookbook generator, but .delivery/config.json was not created.");
-                sayln("red", "Please update your generator to create a valid .delivery/config.json or pass in a custom config.");
-                return None;
-            }
-            return Some(true)
+            generate_custom_build_cookbook(generator_str, cache_path, project_path)
         },
         // Default build cookbook
         None => {
@@ -271,14 +245,46 @@ fn generate_build_cookbook(generator: Option<String>) -> Option<bool> {
                 return Some(false)
             } else {
                 let command = project::create_default_build_cookbook();
+                // TODO: move output up to init post --for bugfix.
                 git::git_push_master().unwrap();
                 sayln("green", &format!("Build-cookbook generated: {:#?}", command));
                 return Some(false)
             }
         }
-    };
+    }
 }
 
+fn generate_custom_build_cookbook(generator_str: String, cache_path: PathBuf, project_path: PathBuf) -> Option<bool> {
+    let gen_path = Path::new(&generator_str);
+    let mut generator_path = cache_path.clone();
+    generator_path.push(gen_path.file_stem().unwrap());
+    match project::download_or_mv_custom_build_cookbook_generator(&gen_path, &cache_path) {
+        project::CustomCookbookSource::Disk => {
+            say("white", "Copying custom build-cookbook generator to ");
+            sayln("yellow", &format!("{:?}", &cache_path));
+        },
+        project::CustomCookbookSource::Cached => {
+            sayln("yellow", &format!("Using cached copy of build-cookbook generator {:?}",
+                                     &cache_path));
+        },
+        project::CustomCookbookSource::Git => {
+            say("white", "Downloading build-cookbook generator from ");
+            sayln("yellow", &format!("{:?}", &generator_str));
+        }
+    }
+    
+    let command = project::chef_generate_build_cookbook_from_generator(&generator_path, &project_path);
+    sayln("green", &format!("Build-cookbook generated: {:#?}", command));
+
+    let config_path = project_path.join(".delivery/config.json");
+    if !(config_path.exists()) {
+        sayln("red", "You used a custom build cookbook generator, but .delivery/config.json was not created.");
+        sayln("red", "Please update your generator to create a valid .delivery/config.json or pass in a custom config.");
+        return None;
+    }
+    return Some(true)
+}
+    
 fn generate_delivery_config(config_json: Option<String>) -> bool {
     if let Some(json) = config_json {
         let proj_path = project::project_path();
@@ -296,7 +302,7 @@ fn generate_delivery_config(config_json: Option<String>) -> bool {
 
         // Commit to git
         say("white", "Git add and commit delivery config: ");
-        DeliveryConfig::git_add_commit_config(&json_path);
+        DeliveryConfig::git_add_commit_config(&json_path).unwrap();
         sayln("green", "done");
 
         return true
@@ -305,15 +311,15 @@ fn generate_delivery_config(config_json: Option<String>) -> bool {
     }
 }
 
-/// Triggers a delvery review
+// Triggers a delvery review.
 fn trigger_review(config: Config, scp: Option<project::SourceCodeProvider>,
-                  no_open: &bool) -> Result<(), DeliveryError> {    
+                  no_open: &bool) -> () {    
     let pipeline = config.pipeline().unwrap();
     match scp {
         Some(s) => {
             match s.kind {
                 project::Type::Bitbucket => {
-                    try!(cli::review(&pipeline, &false, no_open, &false));
+                    cli::review(&pipeline, &false, no_open, &false).unwrap();
                 },
                 project::Type::Github => {
                     // For now, delivery review doesn't works for Github projects
@@ -321,7 +327,7 @@ fn trigger_review(config: Config, scp: Option<project::SourceCodeProvider>,
                     sayln("green", "\nYour project is now set up with changes in the add-delivery-config branch!");
                     sayln("green", "To finalize your project, you must submit and accept a Pull Request in github.");
 
-                    if !(project::check_github_remote(&s)) {
+                    if !(project::check_github_remote()) {
                         setup_github_remote_msg(&s)
                     }
 
@@ -331,9 +337,9 @@ fn trigger_review(config: Config, scp: Option<project::SourceCodeProvider>,
                 }
             }
         },
-        None => try!(cli::review(&pipeline, &false, no_open, &false))
+        None => cli::review(&pipeline, &false, no_open, &false).unwrap()
     }
-    Ok(())
+    ()
 }
 
 fn setup_github_remote_msg(s: &project::SourceCodeProvider) -> () {

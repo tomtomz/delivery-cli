@@ -30,7 +30,6 @@ use errors::{DeliveryError, Kind};
 use git;
 use utils::{walk_tree_for_path, read_file, copy_recursive};
 use utils::path_join_many::PathJoinMany;
-use utils::say::{say, sayln};
 
 #[derive(RustcEncodable, RustcDecodable, Clone)]
 pub struct DeliveryConfig {
