@@ -73,30 +73,23 @@ impl DeliveryConfig {
     /// valid and finally add/commit the changes.
     /// If the config already exists, skip this process.
     pub fn copy_config_file(config_f: &PathBuf,
-                            proj_path: &PathBuf) -> Result<(), DeliveryError> {
+                            proj_path: &PathBuf) -> String {
         let write_path = DeliveryConfig::config_file_path(proj_path);
-        say("white", "Copying configuration to ");
-        sayln("yellow", &format!("{}", write_path.display()));
-        try!(copy_recursive(config_f, &write_path));
-        try!(DeliveryConfig::validate_config_file(proj_path));
-        sayln("magenta", "New delivery configuration");
-        sayln("magenta", "--------------------------");
-        let content = try!(read_file(&write_path));
-        sayln("white", &content);
-        DeliveryConfig::git_add_commit_config(proj_path)
+        copy_recursive(config_f, &write_path).unwrap();
+        DeliveryConfig::validate_config_file(proj_path).unwrap();
+        let content = read_file(&write_path).unwrap();
+        content
     }
 
-    fn git_add_commit_config(proj_path: &PathBuf) -> Result<(), DeliveryError> {
+    pub fn git_add_commit_config(proj_path: &PathBuf) -> Result<(), DeliveryError> {
         let config_path = DeliveryConfig::config_file_path(proj_path);
         let config_path_str = &config_path.to_str().unwrap();
-        say("white", "Git add and commit delivery config: ");
-        try!(git::git_command(&["add", &config_path_str], proj_path));
-        try!(git::git_command(&["commit", "-m", "Adds custom Delivery config"], proj_path));
-        sayln("green", "done");
+        git::git_command(&["add", &config_path_str], proj_path).unwrap();
+        git::git_command(&["commit", "-m", "Adds custom Delivery config"], proj_path).unwrap();
         Ok(())
     }
 
-    fn config_file_path(proj_path: &PathBuf) -> PathBuf {
+    pub fn config_file_path(proj_path: &PathBuf) -> PathBuf {
         proj_path.join_many(&[".delivery", "config.json"])
     }
 
