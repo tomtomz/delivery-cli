@@ -141,7 +141,32 @@ fn create_on_server(config: &Config,
     let client = try!(APIClient::from_config(config));
 
     match scp {
-        Some(scp_config) => try!(project::create_scp_project(client, config, &path, scp_config)),
+        // If the user requested a custom scp
+        Some(scp_config) => {
+            //try!(project::create_scp_project(client, config, &path, scp_config)),
+            let org = try!(config.organization());
+            let proj = try!(config.project());
+            try!(scp_config.verify_server_config(&client));
+            say("white", "Creating ");
+            match scp_config.kind {
+                project::Type::Bitbucket => {
+                    say("magenta", "bitbucket");
+                    say("white", " project: ");
+                    say("magenta", &format!("{} ", proj));
+                    try!(client.create_bitbucket_project(&org, &proj, &scp_config.repo_name,
+                                                         &scp_config.organization, &scp_config.branch));
+                    try!(project::push_project_content_to_delivery(config, &path));
+                },
+                project::Type::Github => {
+                    say("magenta", "github");
+                    say("white", " project: ");
+                    say("magenta", &format!("{} ", proj));
+                    try!(client.create_github_project(&org, &proj, &scp_config.repo_name,
+                                                      &scp_config.organization, &scp_config.branch, scp_config.verify_ssl));
+                }
+            }
+        },
+        // If the user isn't using an scp, just delivery itself
         None => {
             try!(project::create_delivery_project(&client, config));
             try!(project::push_project_content_to_delivery(config, &path));
