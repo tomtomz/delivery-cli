@@ -26,7 +26,7 @@ use std::path::PathBuf;
 use rustc_serialize::json;
 use rustc_serialize::json::DecoderError;
 
-use errors::{DeliveryError, Kind};
+use errors::{DeliveryError, Kind, DeliveryResult};
 use git;
 use utils::{walk_tree_for_path, read_file, copy_recursive};
 use utils::path_join_many::PathJoinMany;
@@ -72,15 +72,15 @@ impl DeliveryConfig {
     /// valid and finally add/commit the changes.
     /// If the config already exists, skip this process.
     pub fn copy_config_file(config_f: &PathBuf,
-                            proj_path: &PathBuf) -> String {
+                            proj_path: &PathBuf) -> DeliveryResult<String> {
         let write_path = DeliveryConfig::config_file_path(proj_path);
-        copy_recursive(config_f, &write_path).unwrap();
-        DeliveryConfig::validate_config_file(proj_path).unwrap();
-        let content = read_file(&write_path).unwrap();
-        content
+        try!(copy_recursive(config_f, &write_path));
+        try!(DeliveryConfig::validate_config_file(proj_path));
+        let content = try!(read_file(&write_path));
+        Ok(content)
     }
 
-    pub fn git_add_commit_config(proj_path: &PathBuf) -> Result<(), DeliveryError> {
+    pub fn git_add_commit_config(proj_path: &PathBuf) -> DeliveryResult<()> {
         let config_path = DeliveryConfig::config_file_path(proj_path);
         let config_path_str = &config_path.to_str().unwrap();
         git::git_command(&["add", &config_path_str], proj_path).unwrap();
@@ -92,7 +92,7 @@ impl DeliveryConfig {
         proj_path.join_many(&[".delivery", "config.json"])
     }
 
-    fn find_config_file(proj_path: &PathBuf) -> Result<PathBuf, DeliveryError> {
+    fn find_config_file(proj_path: &PathBuf) -> DeliveryResult<PathBuf> {
         match walk_tree_for_path(proj_path, ".delivery/config.json") {
             Some(p) => {
                 debug!("found config: {:?}", p);
@@ -104,7 +104,7 @@ impl DeliveryConfig {
         }
     }
 
-    pub fn validate_config_file(proj_path: &PathBuf) -> Result<bool, DeliveryError> {
+    pub fn validate_config_file(proj_path: &PathBuf) -> DeliveryResult<bool> {
         let config_file_path = try!(DeliveryConfig::find_config_file(proj_path));
         let mut config_file = try!(File::open(&config_file_path));
         let mut config_file_content = String::new();

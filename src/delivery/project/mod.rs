@@ -17,7 +17,7 @@
 
 use utils::{self, walk_tree_for_path, mkdir_recursive};
 use utils::path_ext::is_dir;
-use errors::{DeliveryError, Kind};
+use errors::{DeliveryError, Kind, DeliveryResult};
 use std::path::{Path, PathBuf};
 use http::APIClient;
 use git;
@@ -44,7 +44,7 @@ impl SourceCodeProvider {
     // required configuration values are missing. Expects to find
     // `scp`, `repository`, `scp-organization`, `branch`, and `ssl`.
     pub fn new(scp: &str, repo: &str, org: &str, branch: &str,
-               no_ssl: bool) -> Result<SourceCodeProvider, DeliveryError> {
+               no_ssl: bool) -> DeliveryResult<SourceCodeProvider> {
         let scp_kind = match scp {
             "github" => Type::Github,
             "bitbucket" => Type::Bitbucket,
@@ -80,7 +80,7 @@ impl SourceCodeProvider {
     }
 
     // Verify if the SCP is configured on the Delivery Server
-    pub fn verify_server_config(&self, client: &APIClient) -> Result<(), DeliveryError> {
+    pub fn verify_server_config(&self, client: &APIClient) -> DeliveryResult<()> {
         match self.kind {
             Type::Github => {
                 let scp_config = try!(client.get_github_server_config());
@@ -101,12 +101,12 @@ impl SourceCodeProvider {
 
 // Create a Delivery Pipeline.
 // Returns true if created, returns false if already exists.
-pub fn create_delivery_pipeline(client: &APIClient, org: &String, proj: &String, pipe: &String) -> bool {
+pub fn create_delivery_pipeline(client: &APIClient, org: &String, proj: &String, pipe: &String) -> DeliveryResult<bool> {
     if client.pipeline_exists(org, proj, pipe) {
-        return false
+        return Ok(false)
     } else {
-        client.create_pipeline(org, proj, pipe).unwrap();
-        return true
+        try!(client.create_pipeline(org, proj, pipe));
+        return Ok(true)
     }
 }
 
@@ -115,47 +115,47 @@ pub fn create_delivery_pipeline(client: &APIClient, org: &String, proj: &String,
 // If the project already exists, return false
 pub fn create_delivery_project(client: &APIClient,
                                org: &String,
-                               proj: &String) -> bool {
+                               proj: &String) -> DeliveryResult<bool> {
     if client.project_exists(org, proj) {
-        return false
+        return Ok(false)
     } else {
-        client.create_delivery_project(org, proj).unwrap();
-        return true
+        try!(client.create_delivery_project(org, proj));
+        return Ok(true)
     }
 }
 
 // Push local content to the Delivery Server if no upstream commits.
 // Returns true if commits pushed, returns false if upstream commits found.
-pub fn push_project_content_to_delivery() -> bool {
+pub fn push_project_content_to_delivery() -> DeliveryResult<bool> {
     if git::server_content() {
-        return false
+        return Ok(false)
     } else {
         // TODO: move output up to init post --for bugfix.
-        git::git_push_master().unwrap();
-        return true
+        try!(git::git_push_master());
+        return Ok(true)
     }
 }
 
 // Create delivery remote if it doesn't exist. Returns true if created.
-pub fn create_delivery_remote_if_missing(delivery_git_ssh_url: String) -> bool {
-    if git::config_repo(&delivery_git_ssh_url, &project_path()).unwrap() {
-        return true
+pub fn create_delivery_remote_if_missing(delivery_git_ssh_url: String) -> DeliveryResult<bool> {
+    if try!(git::config_repo(&delivery_git_ssh_url, &project_path())) {
+        return Ok(true)
     } else {
-        return false
+        return Ok(false)
     }
 }
 
 // Check to see if the origin remote is set up.
-pub fn check_github_remote() -> bool {
+pub fn check_github_remote() -> DeliveryResult<bool> {
     let git_remote_result = git::git_command(&["remote"], &project_path());
     match git_remote_result {
         Ok(git_result) => {
             if !(git_result.stdout.contains("origin")) {
-                return false
+                return Ok(false)
             }
-            return true
+            return Ok(true)
         },
-        Err(e) => panic!(e) // Unexpected error, raise.
+        Err(e) => return Err(e)
     }
 }
 
@@ -187,7 +187,7 @@ pub fn check_github_remote() -> bool {
 //
 // assert_eq!(root, root_dir(&delivery_src.as_path()).unwrap());
 // ```
-pub fn root_dir(dir: &Path) -> Result<PathBuf, DeliveryError> {
+pub fn root_dir(dir: &Path) -> DeliveryResult<PathBuf> {
     match walk_tree_for_path(&PathBuf::from(&dir), ".git/config") {
         Some(p) => {
            let git_d = p.parent().unwrap();
@@ -205,13 +205,13 @@ pub fn project_path() -> PathBuf {
 }
 
 // Return the project name from the current path
-pub fn project_from_cwd() -> Result<String, DeliveryError> {
+pub fn project_from_cwd() -> DeliveryResult<String> {
     let cwd = try!(self::root_dir(&utils::cwd()));
     Ok(cwd.file_name().unwrap().to_str().unwrap().to_string())
 }
 
 // Return the project name or try to extract it from the current path
-pub fn project_or_from_cwd(proj: &str) -> Result<String, DeliveryError> {
+pub fn project_or_from_cwd(proj: &str) -> DeliveryResult<String> {
     if proj.is_empty() {
         project_from_cwd()
     } else {
@@ -226,57 +226,56 @@ pub fn project_or_from_cwd(proj: &str) -> Result<String, DeliveryError> {
 // out master and deleting this feature branch.
 //
 // If feature branch created, return true, else return false.
-pub fn create_feature_branch_if_missing(project_path: &PathBuf) -> bool {
+pub fn create_feature_branch_if_missing(project_path: &PathBuf) -> DeliveryResult<bool> {
     match git::git_command(&["checkout", "-b", "add-delivery-config"], project_path) {
         Ok(_) => {
-            return true;
+            return Ok(true);
         },
         Err(e) => {
             match e.detail.clone() {
                 Some(msg) => {
                     if msg.contains("A branch named 'add-delivery-config' already exists") {
-                        git::git_command(&["checkout", "add-delivery-config"], project_path).unwrap();
-                        return false;
+                       try!(git::git_command(&["checkout", "add-delivery-config"], project_path));
+                        return Ok(false)
                     } else {
-                        // Unexpected error, raise.
-                        panic!(e)
+                        return Err(e)
                     }
                 },
                 // Unexpected error, raise.
-                None => panic!(e)
+                None => Err(e)
             }
         }
     }
 }
 
 // Add and commit the generated build-cookbook
-pub fn add_commit_build_cookbook(custom_config_passed: &bool) -> () {
+pub fn add_commit_build_cookbook(custom_config_passed: &bool) -> DeliveryResult<()> {
     // .delivery is probably not yet under version control, so we have to add
     // the whole folder instead of .delivery/build-cookbook.
-    git::git_command(&["add", ".delivery"], &project_path()).unwrap();
+    try!(git::git_command(&["add", ".delivery"], &project_path()));
     let mut commit_msg = "Adds Delivery build cookbook".to_string();
     if !(*custom_config_passed) {
         commit_msg = commit_msg + " and config";
     }
-    git::git_command(&["commit", "-m", &commit_msg], &project_path()).unwrap();
-    ()
+    try!(git::git_command(&["commit", "-m", &commit_msg], &project_path()));
+    Ok(())
 }
 
 pub fn create_dot_delivery() -> &'static Path {
+    // TODO: should we be doing some relative pathing here?
     let dot_delivery = Path::new(".delivery");
-    // Not expecting errors, no need to handle them.
     fs::create_dir_all(dot_delivery).unwrap();
     dot_delivery
 }
 
-pub fn create_default_build_cookbook() -> Output {
+pub fn create_default_build_cookbook() -> DeliveryResult<Output> {
     let mut gen = utils::make_command("chef");
     gen.arg("generate")
         .arg("build-cookbook")
         .arg(".delivery/build-cookbook")
         .current_dir(&project_path());
-    let output = gen.output().unwrap();
-    output
+    let output = try!(gen.output());
+    Ok(output)
 }
 
 #[derive(Debug)]
@@ -292,19 +291,19 @@ pub enum CustomCookbookSource {
 // 1) A local path
 // 2) Or a git repo URL
 // TODO) From Supermarket
-pub fn download_or_mv_custom_build_cookbook_generator(generator: &Path, cache_path: &Path) -> CustomCookbookSource {
-    mkdir_recursive(cache_path).unwrap();
+pub fn download_or_mv_custom_build_cookbook_generator(generator: &Path, cache_path: &Path) -> DeliveryResult<CustomCookbookSource> {
+    try!(mkdir_recursive(cache_path));
     if generator.has_root() {
-        utils::copy_recursive(&generator, &cache_path).unwrap();
-        return CustomCookbookSource::Disk
+        try!(utils::copy_recursive(&generator, &cache_path));
+        return Ok(CustomCookbookSource::Disk)
     } else {
         let cache_path_str = &cache_path.to_string_lossy();
         let generator_str = &generator.to_string_lossy();
         if is_dir(&cache_path) {
-            return CustomCookbookSource::Cached
+            return Ok(CustomCookbookSource::Cached)
         } else {
-            git::clone(&cache_path_str, &generator_str).unwrap();
-            return CustomCookbookSource::Git
+            try!(git::clone(&cache_path_str, &generator_str));
+            return Ok(CustomCookbookSource::Git)
         }
     }
 }
@@ -322,7 +321,7 @@ pub fn chef_generate_build_cookbook_from_generator(generator: &Path, project_pat
 }
 
 // Default cookbooks generator cache path
-pub fn generator_cache_path() -> Result<PathBuf, DeliveryError> {
+pub fn generator_cache_path() -> DeliveryResult<PathBuf> {
     utils::home_dir(&[".delivery/cache/generator-cookbooks"])
 }
 

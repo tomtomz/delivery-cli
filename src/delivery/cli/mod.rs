@@ -178,7 +178,10 @@ pub fn run() {
         }
     };
     match cmd_result {
-        Ok(_) => {},
+        // You can exit with any integer, can also be used to bypass default
+        // error handling if you handled an error and returned non-zero.
+        Ok(exit_status) => process::exit(exit_status),
+        // Handles DeliveryError and exits 1.
         Err(e) => exit_with(e, 1)
     }
 }

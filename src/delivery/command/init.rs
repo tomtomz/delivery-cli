@@ -103,13 +103,13 @@ fn init(config: Config, no_open: &bool, skip_build_cookbook: &bool,
         say("white", "Creating and checking out ");
         say("yellow", "add-delivery-config");
         say("white", " feature branch: ");
-        if !(project::create_feature_branch_if_missing(&project_path)) {
+        if !(try!(project::create_feature_branch_if_missing(&project_path))) {
             say("white", "A branch named 'add-delivery-config' already exists, switching to it.\n");
         }
 
         if custom_build_cookbook_generated {
             say("white", "Adding and commiting build-cookbook: ");
-            project::add_commit_build_cookbook(&custom_config_passed);
+            try!(project::add_commit_build_cookbook(&custom_config_passed));
             sayln("green", "done");
         }
 
@@ -120,7 +120,7 @@ fn init(config: Config, no_open: &bool, skip_build_cookbook: &bool,
     } else {
         if let Some(project_type) = scp {
             if project_type.kind == project::Type::Github {
-                if !(project::check_github_remote()) {
+                if !(try!(project::check_github_remote())) {
                     setup_github_remote_msg(&project_type)
                 }
             }
@@ -178,7 +178,7 @@ fn create_on_server(config: &Config,
             let pipe = try!(config.pipeline());
 
             // Create delivery project on server unless it already exists.
-            if project::create_delivery_project(&client, &org, &proj) {
+            if try!(project::create_delivery_project(&client, &org, &proj)) {
                 say("white", "Creating ");
                 say("magenta", "delivery");
                 say("white", " project: ");
@@ -190,7 +190,7 @@ fn create_on_server(config: &Config,
             }
 
             // Setup delivery remote
-            if project::create_delivery_remote_if_missing(git_url) {
+            if try!(project::create_delivery_remote_if_missing(git_url)) {
                 sayln("white", "Remote 'delivery' added to git config!")
             } else {
                 sayln("white", "Remote named 'delivery' already exists and is correct - not modifying")
@@ -199,12 +199,12 @@ fn create_on_server(config: &Config,
             // Push content to master if no upstream commits.
             say("white", "Checking for content on the git remote ");
             say("magenta", "delivery: ");
-            if !(project::push_project_content_to_delivery()) {
+            if !(try!(project::push_project_content_to_delivery())) {
                 sayln("red", "Found commits upstream, not pushing local commits")
             }
 
             // Create delivery pipeline unless it already exists.
-            if project::create_delivery_pipeline(&client, &org, &proj, &pipe) {
+            if try!(project::create_delivery_pipeline(&client, &org, &proj, &pipe)) {
                 say("white", "Created ");
                 say("magenta", &format!("{}", pipe));
                 say("white", " pipeline for project: ");
@@ -224,7 +224,7 @@ fn create_bitbucket_project(org: String, proj: String, git_url: String, client: 
     try!(client.create_bitbucket_project(&org, &proj, &scp_config.repo_name,
                                          &scp_config.organization, &scp_config.branch));
     // Setup delivery remote
-    if project::create_delivery_remote_if_missing(git_url) {
+    if try!(project::create_delivery_remote_if_missing(git_url)) {
         sayln("white", "Remote 'delivery' added to git config!")
     } else {
         sayln("white", "Remote named 'delivery' already exists and is correct - not modifying")
@@ -233,7 +233,7 @@ fn create_bitbucket_project(org: String, proj: String, git_url: String, client: 
     // Push content to master if no upstream commits
     say("white", "Checking for content on the git remote ");
     say("magenta", "delivery: ");
-    if !(project::push_project_content_to_delivery()) {
+    if !(try!(project::push_project_content_to_delivery())) {
         sayln("red", "Found commits upstream, not pushing local commits");
     };
     Ok(())
@@ -259,7 +259,7 @@ fn generate_build_cookbook(generator: Option<String>) -> DeliveryResult<bool> {
                 sayln("red", ".delivery/build-cookbook folder already exists, skipping build cookbook generation.");
                 return Ok(false)
             } else {
-                let command = project::create_default_build_cookbook();
+                let command = try!(project::create_default_build_cookbook());
                 // TODO: move output up to init post --for bugfix.
                 try!(git::git_push_master());
                 sayln("green", &format!("Build-cookbook generated: {:#?}", command));
@@ -273,7 +273,7 @@ fn generate_custom_build_cookbook(generator_str: String, cache_path: PathBuf, pr
     let gen_path = Path::new(&generator_str);
     let mut generator_path = cache_path.clone();
     generator_path.push(gen_path.file_stem().unwrap());
-    match project::download_or_mv_custom_build_cookbook_generator(&gen_path, &cache_path) {
+    match try!(project::download_or_mv_custom_build_cookbook_generator(&gen_path, &cache_path)) {
         project::CustomCookbookSource::Disk => {
             say("white", "Copying custom build-cookbook generator to ");
             sayln("yellow", &format!("{:?}", &cache_path));
@@ -306,7 +306,7 @@ fn generate_delivery_config(config_json: Option<String>) -> DeliveryResult<bool>
         let json_path = PathBuf::from(json);
 
         // Create config
-        let content = DeliveryConfig::copy_config_file(&json_path, &proj_path);
+        let content = try!(DeliveryConfig::copy_config_file(&json_path, &proj_path));
 
         say("white", "Copying configuration to ");
         sayln("yellow", &format!("{:?}", DeliveryConfig::config_file_path(&proj_path)));
@@ -341,7 +341,7 @@ fn trigger_review(config: Config, scp: Option<project::SourceCodeProvider>,
                     sayln("green", "\nYour project is now set up with changes in the add-delivery-config branch!");
                     sayln("green", "To finalize your project, you must submit and accept a Pull Request in github.");
 
-                    if !(project::check_github_remote()) {
+                    if !(try!(project::check_github_remote())) {
                         setup_github_remote_msg(&s)
                     }
 
