@@ -32,6 +32,21 @@ pub fn run_chef_exec_command(exec_cmd: &str, args: &Vec<&str>) -> i32 {
     return return_code
 }
 
+
+pub fn run_script(script_path: &str, phase: &str) -> i32 {
+    let output = utils::make_command(&format!("{}/{}", script_path, phase))
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .output()
+        .unwrap_or_else(|e| { panic!("Unexpected error: Failed to execute process: {}", e) });
+
+    let return_code = match output.status.code() {
+        Some(code) => code,
+        _ => 1
+    };
+    return return_code
+}
+
 pub fn wrap_kitchen_command(args: &Vec<&str>, kitchen_cmd: &str, usage: &str) -> i32 {
     if !args.is_empty() {
         match args[0].as_ref() {

@@ -4,6 +4,9 @@ use std::process;
 use utils::say::sayln;
 use errors::DeliveryError;
 
+use utils;
+use project::root_dir;
+
 // Implemented sub-commands. Should handle everything after args have
 // been parsed, including running the command, error handling, and UI outputting.
 use command::cleanup;
@@ -13,6 +16,7 @@ use command::provision;
 use command::smoke;
 use command::syntax;
 use command::unit;
+use command;
 
 // Local subcommand is for wrapping external commands and running
 // the locally.
@@ -57,28 +61,31 @@ pub fn parse_clap_matches(global_matches: &ArgMatches) -> Result<(), DeliveryErr
             // so we will just validate the subcommand to local directly.
             let args: Vec<_> = env::args().collect();
 
+            let mut proj_dir = try!(root_dir(&utils::cwd()));
+            proj_dir.push(".delivery/build_scripts");
+
             // Match the third arg of `delivery local <any_subcommand>`.
             match args[2].as_ref() {
                 "cleanup" => {
-                    process::exit(cleanup::run(&post_subcommand_args))
+                    process::exit(command::run_script(proj_dir.to_str().unwrap(), "cleanup"))
                 },
                 "deploy" => {
-                    process::exit(deploy::run(&post_subcommand_args))
+                    process::exit(command::run_script(proj_dir.to_str().unwrap(), "deploy"))
                 },
                 "lint" => {
-                    process::exit(lint::run(&post_subcommand_args))
+                    process::exit(command::run_script(proj_dir.to_str().unwrap(), "lint"))
                 },
                 "provision" => {
-                    process::exit(provision::run(&post_subcommand_args))
+                    process::exit(command::run_script(proj_dir.to_str().unwrap(), "provision"))
                 },
                 "smoke" => {
-                    process::exit(smoke::run(&post_subcommand_args))
+                    process::exit(command::run_script(proj_dir.to_str().unwrap(), "smoke"))
                 },
                 "syntax" => {
-                    process::exit(syntax::run(&post_subcommand_args))
+                    process::exit(command::run_script(proj_dir.to_str().unwrap(), "syntax"))
                 },
                 "unit" => {
-                    process::exit(unit::run(&post_subcommand_args))
+                    process::exit(command::run_script(proj_dir.to_str().unwrap(), "unit"))
                 }
                 unknown => {
                     sayln("red", &format!("You passed subcommand '{}' to 'delivery {}'.", unknown, SUBCOMMAND_NAME));
