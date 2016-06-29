@@ -135,7 +135,7 @@ pub fn run() {
         (init::SUBCOMMAND_NAME, Some(matches)) => {
             handle_spinner(&matches);
             let init_opts = init::InitClapOptions::new(&matches);
-             process::exit(command::init::run(init_opts))
+            command::init::run(init_opts)
         },
         (job::SUBCOMMAND_NAME, Some(matches)) => {
             handle_spinner(&matches);
@@ -166,7 +166,7 @@ pub fn run() {
             std::thread::sleep(sleep_time);
             spinner.stop();
             handle_spinner(&matches);
-            Ok(())
+            Ok(0)
         },
         _ => {
             // ownership issue with use of above defined app
@@ -217,7 +217,6 @@ fn exit_with(e: DeliveryError, i: isize) {
     process::exit(x)
 }
 
-// TODO: move
 pub fn load_config(path: &PathBuf) -> Result<Config, DeliveryError> {
     say("white", "Loading configuration from ");
     let msg = format!("{}", path.display());
@@ -226,7 +225,7 @@ pub fn load_config(path: &PathBuf) -> Result<Config, DeliveryError> {
     Ok(config)
 }
 
-fn setup(opts: &setup::SetupClapOptions) -> Result<(), DeliveryError> {
+fn setup(opts: &setup::SetupClapOptions) -> Result<i32, DeliveryError> {
     sayln("green", "Chef Delivery");
     let config_path = if opts.path.is_empty() {
         cwd()
@@ -240,11 +239,11 @@ fn setup(opts: &setup::SetupClapOptions) -> Result<(), DeliveryError> {
         .set_organization(opts.org)
         .set_pipeline(opts.pipeline) ;
     try!(config.write_file(&config_path));
-    Ok(())
+    Ok(0)
 }
 
 pub fn review(for_pipeline: &str, auto_bump: &bool,
-          no_open: &bool, edit: &bool) -> Result<(), DeliveryError> {
+          no_open: &bool, edit: &bool) -> Result<i32, DeliveryError> {
     sayln("green", "Chef Delivery");
     let mut config = try!(load_config(&cwd()));
     config = config.set_pipeline(for_pipeline);
@@ -295,7 +294,7 @@ fn edit_change(config: &Config,
 }
 
 fn handle_review_result(review: &ReviewResult,
-                        no_open: &bool) -> Result<(), DeliveryError> {
+                        no_open: &bool) -> Result<i32, DeliveryError> {
     for line in review.messages.iter() {
         sayln("white", line);
     }
@@ -308,10 +307,10 @@ fn handle_review_result(review: &ReviewResult,
         },
         None => {}
     };
-    Ok(())
+    Ok(0)
 }
 
-fn checkout(opts: &checkout::CheckoutClapOptions) -> Result<(), DeliveryError> {
+fn checkout(opts: &checkout::CheckoutClapOptions) -> Result<i32, DeliveryError> {
     sayln("green", "Chef Delivery");
     let mut config = try!(load_config(&cwd()));
     config = config.set_pipeline(opts.pipeline);
@@ -333,10 +332,10 @@ fn checkout(opts: &checkout::CheckoutClapOptions) -> Result<(), DeliveryError> {
         }
     };
     try!(git::checkout_review(opts.change, pset, &target));
-    Ok(())
+    Ok(0)
 }
 
-fn diff(opts: &diff::DiffClapOptions) ->  Result<(), DeliveryError> {
+fn diff(opts: &diff::DiffClapOptions) ->  Result<i32, DeliveryError> {
     sayln("green", "Chef Delivery");
     let mut config = try!(load_config(&cwd()));
     config = config.set_pipeline(opts.pipeline);
@@ -353,10 +352,10 @@ fn diff(opts: &diff::DiffClapOptions) ->  Result<(), DeliveryError> {
         sayln("yellow", opts.patchset);
     }
     try!(git::diff(opts.change, opts.patchset, &target, &opts.local));
-    Ok(())
+    Ok(0)
 }
 
-fn clone(opts: &clone::CloneClapOptions) -> Result<(), DeliveryError> {
+fn clone(opts: &clone::CloneClapOptions) -> Result<i32, DeliveryError> {
     sayln("green", "Chef Delivery");
     let mut config = try!(load_config(&cwd()));
     config = config.set_user(opts.user)
@@ -378,10 +377,10 @@ fn clone(opts: &clone::CloneClapOptions) -> Result<(), DeliveryError> {
     let project_root = cwd().join(opts.project);
     try!(git::config_repo(&delivery_url,
                           &project_root));
-    Ok(())
+    Ok(0)
 }
 
-fn job(opts: &job::JobClapOptions) -> Result<(), DeliveryError> {
+fn job(opts: &job::JobClapOptions) -> Result<i32, DeliveryError> {
     sayln("green", "Chef Delivery");
     if !opts.docker_image.is_empty() {
         // The --docker flag was specified, let's do this!
@@ -462,7 +461,7 @@ fn job(opts: &job::JobClapOptions) -> Result<(), DeliveryError> {
                 }
             }
         }
-        return Ok(());
+        return Ok(0);
     }
 
     let mut config = try!(load_config(&cwd()));
@@ -579,7 +578,7 @@ fn job(opts: &job::JobClapOptions) -> Result<(), DeliveryError> {
     };
     sayln("magenta", &format!("Running {} {}", phase_msg, phases.join(", ")));
     try!(ws.run_job(opts.phases, &privilege_drop, &local_change));
-    Ok(())
+    Ok(0)
 }
 
 fn maybe_add_flag_value(cmd: &mut Command, flag: &str, value: &str) {
@@ -602,7 +601,7 @@ fn with_default<'a>(val: &'a str, default: &'a str, local: &bool) -> &'a str {
     }
 }
 
-fn token(opts: &token::TokenClapOptions) -> Result<(), DeliveryError> {
+fn token(opts: &token::TokenClapOptions) -> Result<i32, DeliveryError> {
     sayln("green", "Chef Delivery");
     let mut config = try!(load_config(&cwd()));
     config = config.set_server(opts.server)
@@ -617,7 +616,7 @@ fn token(opts: &token::TokenClapOptions) -> Result<(), DeliveryError> {
     } else {
         try!(TokenStore::request_token(&config));
     }
-    Ok(())
+    Ok(0)
 }
 
 fn version() -> String {
@@ -630,7 +629,7 @@ fn build_git_sha() -> String {
     format!("({})", sha)
 }
 
-fn api_req(opts: &api::ApiClapOptions) -> Result<(), DeliveryError> {
+fn api_req(opts: &api::ApiClapOptions) -> Result<i32, DeliveryError> {
     let mut config = try!(Config::load_config(&cwd()));
     config = config.set_user(opts.user)
         .set_server(opts.server)
@@ -655,7 +654,7 @@ fn api_req(opts: &api::ApiClapOptions) -> Result<(), DeliveryError> {
             println!("{}", pretty_json);
         }
     };
-    Ok(())
+    Ok(0)
 }
 
 fn value_of<'a>(matches: &'a ArgMatches, key: &str) -> &'a str {

@@ -219,19 +219,6 @@ pub fn project_or_from_cwd(proj: &str) -> Result<String, DeliveryError> {
     }
 }
 
-// Handle custom delivery config generation
-//
-// Receives a custom config.json file that will be copy to the current project repo
-// pub fn generate_custom_delivery_config(config_json: Option<String>) -> bool {
-//     if let Some(json) = config_json {
-//         let json_path = PathBuf::from(json);
-//         DeliveryConfig::copy_config_file(&json_path, &project_path()).unwrap();
-//         return true
-//     } else {
-//         return false
-//     }
-// }
-
 // Create the feature branch `add-delivery-config`
 //
 // This branch is created to start modifying the project repository

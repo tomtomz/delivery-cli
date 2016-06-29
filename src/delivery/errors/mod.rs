@@ -21,6 +21,7 @@ use std::num;
 use std::io;
 use std::fmt;
 use hyper;
+use std::result;
 use hyper::error::Error as HttpError;
 
 #[derive(Debug)]
@@ -46,6 +47,7 @@ pub enum Kind {
     GitSetupFailed,
     ConfigParse,
     MissingConfig,
+    MissingConfigFile,
     ConfigValidation,
     IoError,
     JsonError,
@@ -91,6 +93,8 @@ impl DeliveryError {
     }
 }
 
+pub type DeliveryResult<T> = result::Result<T, DeliveryError>;
+
 impl error::Error for DeliveryError {
     fn description(&self) -> &str {
         match self.kind {
@@ -113,6 +117,7 @@ impl error::Error for DeliveryError {
             Kind::UnknownProjectType => "Unknown Project Type",
             Kind::ConfigParse => "Failed to parse the cli config file",
             Kind::MissingConfig => "A configuration value is missing",
+            Kind::MissingConfigFile => "Could not find the configuration file.",
             Kind::ConfigValidation => "A required option is missing - use the command line options or 'delivery setup'",
             Kind::IoError => "An I/O Error occurred",
             Kind::JsonError => "A JSON Parser error occured",
