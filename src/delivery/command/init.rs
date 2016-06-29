@@ -19,8 +19,8 @@ use errors::{Kind, DeliveryError, DeliveryResult};
 
 pub fn run(init_opts: InitClapOptions) -> DeliveryResult<i32> {
     sayln("green", "Chef Delivery");
-    let mut config = load_config(&utils::cwd()).unwrap();
-    let final_proj = project::project_or_from_cwd(init_opts.project).unwrap();
+    let mut config = try!(load_config(&utils::cwd()));
+    let final_proj = try!(project::project_or_from_cwd(init_opts.project));
     config = config.set_user(init_opts.user)
         .set_server(init_opts.server)
         .set_enterprise(init_opts.ent)
@@ -29,7 +29,7 @@ pub fn run(init_opts: InitClapOptions) -> DeliveryResult<i32> {
         .set_pipeline(init_opts.pipeline)
         .set_generator(init_opts.generator)
         .set_config_json(init_opts.config_json);
-    let branch = config.pipeline().unwrap();
+    let branch = try!(config.pipeline());
 
     if !init_opts.github_org_name.is_empty() && !init_opts.bitbucket_project_key.is_empty() {
         sayln("red", "Please specify just one Source Code Provider: delivery(default), github or bitbucket.");
@@ -39,15 +39,15 @@ pub fn run(init_opts: InitClapOptions) -> DeliveryResult<i32> {
     let mut scp: Option<project::SourceCodeProvider> = None;
     if !init_opts.github_org_name.is_empty() {
         scp = Some(
-            project::SourceCodeProvider::new("github", &init_opts.repo_name,
-                                             &init_opts.github_org_name, &branch,
-                                             init_opts.no_v_ssl).unwrap()
+            try!(project::SourceCodeProvider::new("github", &init_opts.repo_name,
+                                                  &init_opts.github_org_name, &branch,
+                                                  init_opts.no_v_ssl))
         );
     } else if !init_opts.bitbucket_project_key.is_empty() {
         scp = Some(
-            project::SourceCodeProvider::new("bitbucket", &init_opts.repo_name,
-                                             &init_opts.bitbucket_project_key,
-                                             &branch, true).unwrap()
+            try!(project::SourceCodeProvider::new("bitbucket", &init_opts.repo_name,
+                                                  &init_opts.bitbucket_project_key,
+                                                  &branch, true))
         );
     }
 
@@ -288,7 +288,7 @@ fn generate_custom_build_cookbook(generator_str: String, cache_path: PathBuf, pr
         }
     }
     
-    let command = project::chef_generate_build_cookbook_from_generator(&generator_path, &project_path);
+    let command = try!(project::chef_generate_build_cookbook_from_generator(&generator_path, &project_path));
     sayln("green", &format!("Build-cookbook generated: {:#?}", command));
 
     let config_path = project_path.join(".delivery/config.json");
@@ -316,7 +316,7 @@ fn generate_delivery_config(config_json: Option<String>) -> DeliveryResult<bool>
 
         // Commit to git
         say("white", "Git add and commit delivery config: ");
-        try!(DeliveryConfig::git_add_commit_config(&json_path));
+        try!(DeliveryConfig::git_add_commit_config(&proj_path));
         sayln("green", "done");
 
         return Ok(true)

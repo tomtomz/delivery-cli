@@ -83,8 +83,8 @@ impl DeliveryConfig {
     pub fn git_add_commit_config(proj_path: &PathBuf) -> DeliveryResult<()> {
         let config_path = DeliveryConfig::config_file_path(proj_path);
         let config_path_str = &config_path.to_str().unwrap();
-        git::git_command(&["add", &config_path_str], proj_path).unwrap();
-        git::git_command(&["commit", "-m", "Adds custom Delivery config"], proj_path).unwrap();
+        try!(git::git_command(&["add", &config_path_str], proj_path));
+        try!(git::git_command(&["commit", "-m", "Adds custom Delivery config"], proj_path));
         Ok(())
     }
 

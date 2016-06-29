@@ -268,14 +268,15 @@ pub fn create_dot_delivery() -> &'static Path {
     dot_delivery
 }
 
-pub fn create_default_build_cookbook() -> DeliveryResult<Output> {
-    let mut gen = utils::make_command("chef");
-    gen.arg("generate")
+pub fn create_default_build_cookbook() -> DeliveryResult<Command> {
+    let mut command = utils::make_command("chef");
+    command.arg("generate")
         .arg("build-cookbook")
         .arg(".delivery/build-cookbook")
         .current_dir(&project_path());
-    let output = try!(gen.output());
-    Ok(output)
+    let output = try!(command.output());
+    try!(handle_chef_generate_cookbook_cmd(output));
+    Ok(command)
 }
 
 #[derive(Debug)]
@@ -309,7 +310,7 @@ pub fn download_or_mv_custom_build_cookbook_generator(generator: &Path, cache_pa
 }
 
 // Generate the build-cookbook using ChefDK generate
-pub fn chef_generate_build_cookbook_from_generator(generator: &Path, project_path: &Path) -> Command {
+pub fn chef_generate_build_cookbook_from_generator(generator: &Path, project_path: &Path) -> DeliveryResult<Command> {
     let mut command = utils::make_command("chef");
     command.arg("generate")
         .arg("cookbook")
@@ -317,12 +318,32 @@ pub fn chef_generate_build_cookbook_from_generator(generator: &Path, project_pat
         .arg("-g")
         .arg(generator)
         .current_dir(&project_path);
-    command
+
+    let output = try!(command.output());
+    try!(handle_chef_generate_cookbook_cmd(output));
+    Ok(command)
 }
 
 // Default cookbooks generator cache path
 pub fn generator_cache_path() -> DeliveryResult<PathBuf> {
     utils::home_dir(&[".delivery/cache/generator-cookbooks"])
+}
+
+fn handle_chef_generate_cookbook_cmd(output: Output) -> DeliveryResult<()> {
+    if !output.status.success() {
+        return Err(
+            DeliveryError {
+                kind: Kind::FailedToExecute,
+                detail: Some(format!(
+                            "Failed to execute chef generate:\n\
+                            STDOUT: {}\nSTDERR: {}",
+                            String::from_utf8_lossy(&output.stdout),
+                            String::from_utf8_lossy(&output.stderr)
+                        ))
+            }
+        )
+    }
+    Ok(())
 }
 
 #[cfg(test)]
