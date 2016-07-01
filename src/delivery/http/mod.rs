@@ -143,11 +143,11 @@ impl APIClient {
         match response.status {
             StatusCode::NoContent => Ok(()),
             StatusCode::Created => {
-                sayln("green", " created");
+                debug!(" created");
                 Ok(())
             },
             StatusCode::Conflict => {
-                sayln("white", " already exists.");
+                debug!(" already exists.");
                 Ok(())
             },
             StatusCode::Unauthorized => {
@@ -248,7 +248,7 @@ impl APIClient {
     pub fn pipeline_exists(&self,
                           org: &str, proj: &str, pipe: &str) -> bool {
 
-        let path = format!("orgs/{}/projects/{}/pipeline/{}", org, proj, pipe);
+        let path = format!("orgs/{}/projects/{}/pipelines/{}", org, proj, pipe);
         match self.get(&path) {
             Ok(res) => {
                 match res.status {

@@ -129,7 +129,7 @@ pub fn create_delivery_project(client: &APIClient,
 // Push local content to the Delivery Server if no upstream commits.
 // Returns true if commits pushed, returns false if upstream commits found.
 pub fn push_project_content_to_delivery(pipeline: &str) -> DeliveryResult<bool> {
-    if git::server_content(pipeline) {
+    if try!(git::server_content(pipeline)) {
         Ok(false)
     } else {
         try!(git::git_push(pipeline));
@@ -139,8 +139,8 @@ pub fn push_project_content_to_delivery(pipeline: &str) -> DeliveryResult<bool> 
 
 // Create delivery remote if it doesn't exist. Returns true if created.
 pub fn create_delivery_remote_if_missing(
-      delivery_git_ssh_url: String) -> DeliveryResult<bool> {
-    if try!(git::config_repo(&delivery_git_ssh_url, &project_path())) {
+      delivery_git_ssh_url: &String) -> DeliveryResult<bool> {
+    if try!(git::config_repo(delivery_git_ssh_url, &project_path())) {
         return Ok(true)
     } else {
         return Ok(false)
