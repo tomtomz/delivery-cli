@@ -153,6 +153,65 @@ pub fn file_needs_updated(source_f: &PathBuf, dest_f: &PathBuf) ->Result<bool, D
     Ok(true)
 }
 
+/// Returns the absolute path for a given command, if it exists, by searching the `PATH`
+/// environment variable.
+///
+/// If the command represents an absolute path, then the `PATH` seaching will not be performed. If
+/// no absolute path can be found for the command, then `None` is returned.
+///
+/// On Windows, the PATHEXT environment variable contains common extensions for commands, 
+/// for example allowing "docker.exe" to be found when searching for "docker".
+pub fn find_command(command: &str) -> Option<PathBuf> {
+    // If the command path is absolute and a file exists, then use that.
+    let candidate = PathBuf::from(command);
+    if candidate.is_absolute() && candidate.is_file() {
+        return Some(candidate);
+    }
+
+    // Find the command by checking each entry in `PATH`. If we still can't find it, give up and
+    // return `None`.
+    match env::var_os("PATH") {
+        Some(paths) => {
+            for path in env::split_paths(&paths) {
+                let candidate = PathBuf::from(&path).join(command);
+                if candidate.is_file() {
+                    return Some(candidate);
+                } else {
+                    match find_command_with_pathext(&candidate) {
+                        Some(result) => return Some(result),
+                        None => {}
+                    }
+                }
+            }
+            None
+        }
+        None => None,
+    }
+}
+
+// Windows relies on path extensions to resolve commands like `docker` to `docker.exe`
+// Path extensions are found in the PATHEXT environment variable.
+// We should only search with PATHEXT if the file does not already have an extension.
+fn find_command_with_pathext(candidate: &PathBuf) -> Option<PathBuf> {
+    if candidate.extension().is_none() {
+        match env::var_os("PATHEXT") {
+            Some(pathexts) => {
+                for pathext in env::split_paths(&pathexts) {
+                    let mut source_candidate = candidate.to_path_buf();
+                    let extension = pathext.to_str().unwrap().trim_matches('.');
+                    source_candidate.set_extension(extension);
+                    let current_candidate = source_candidate.to_path_buf();
+                    if current_candidate.is_file() {
+                        return Some(current_candidate);
+                    }
+                }
+            }
+            None => {},
+        };
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::walk_tree_for_path;
