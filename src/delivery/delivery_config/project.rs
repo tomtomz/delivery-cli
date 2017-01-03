@@ -41,14 +41,14 @@ pub struct ProjectToml {
 
 #[derive(RustcEncodable, RustcDecodable, Clone, Debug)]
 pub struct LocalPhases {
-    pub unit: String,
-    pub lint: String,
-    pub syntax: String,
-    pub provision: String,
-    pub deploy: String,
-    pub smoke: String,
-    pub functional: String,
-    pub cleanup: String,
+    pub unit: Option<String>,
+    pub lint: Option<String>,
+    pub syntax: Option<String>,
+    pub provision: Option<String>,
+    pub deploy: Option<String>,
+    pub smoke: Option<String>,
+    pub functional: Option<String>,
+    pub cleanup: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -68,14 +68,14 @@ impl Default for ProjectToml {
         ProjectToml {
             remote_file: None,
             local_phases: LocalPhases {
-                unit: String::from(""),
-                lint: String::from(""),
-                syntax: String::from(""),
-                provision: String::from(""),
-                deploy: String::from(""),
-                smoke: String::from(""),
-                functional: String::from(""),
-                cleanup: String::from("")
+                unit: None,
+                lint: None,
+                syntax: None,
+                provision: None,
+                deploy: None,
+                smoke: None,
+                functional: None,
+                cleanup: None
             }
         }
     }
@@ -122,18 +122,27 @@ impl ProjectToml {
         }
     }
 
+    fn load_phase_cmd(&self, p: Phase) -> DeliveryResult<String> {
+        match p {
+            Phase::Unit       => {
+                match self.local_phases.unit.clone() {
+                    Some(value) => Ok(value),
+                    None => Err(DeliveryError{ kind: Kind::PhaseNotFound, detail: None })
+                }
+            },
+            Phase::Lint       => self.local_phases.lint.clone().ok_or(DeliveryError{ kind: Kind::PhaseNotFound, detail: None }),
+            Phase::Syntax     => self.local_phases.syntax.clone().ok_or(DeliveryError{ kind: Kind::PhaseNotFound, detail: None }),
+            Phase::Provision  => self.local_phases.provision.clone().ok_or(DeliveryError{ kind: Kind::PhaseNotFound, detail: None }),
+            Phase::Deploy     => self.local_phases.deploy.clone().ok_or(DeliveryError{ kind: Kind::PhaseNotFound, detail: None }),
+            Phase::Smoke      => self.local_phases.smoke.clone().ok_or(DeliveryError{ kind: Kind::PhaseNotFound, detail: None }),
+            Phase::Functional => self.local_phases.functional.clone().ok_or(DeliveryError{ kind: Kind::PhaseNotFound, detail: None }),
+            Phase::Cleanup    => self.local_phases.cleanup.clone().ok_or(DeliveryError{ kind: Kind::PhaseNotFound, detail: None }),
+        }
+    }
+
     pub fn local_phase(&self, phase: Option<Phase>) -> DeliveryResult<String> {
         if let Some(p) = phase { 
-            match p {
-                Phase::Unit       => Ok(self.local_phases.unit.clone()),
-                Phase::Lint       => Ok(self.local_phases.lint.clone()),
-                Phase::Syntax     => Ok(self.local_phases.syntax.clone()),
-                Phase::Provision  => Ok(self.local_phases.provision.clone()),
-                Phase::Deploy     => Ok(self.local_phases.deploy.clone()),
-                Phase::Smoke      => Ok(self.local_phases.smoke.clone()),
-                Phase::Functional => Ok(self.local_phases.functional.clone()),
-                Phase::Cleanup    => Ok(self.local_phases.cleanup.clone()),
-            }
+            ProjectToml::load_phase_cmd(self, p)
         } else {
             Err(DeliveryError{ kind: Kind::PhaseNotFound, detail: None })
        }

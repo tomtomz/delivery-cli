@@ -27,7 +27,14 @@ end
 def incomplete_project_toml
 <<EOF
 [local_phases]
-lint = "echo 'This file is wrong, we have missing phases'"
+unit = "echo 'only unit is configured'"
+EOF
+end
+
+def invalid_project_toml
+<<EOF
+[local_phasez]
+lint = "echo 'This file is wrong, we have typos'"
 EOF
 end
 

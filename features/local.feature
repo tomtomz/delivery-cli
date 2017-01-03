@@ -41,6 +41,21 @@ Scenario: Executing the syntax phase locally
   Then the output should match /Running.*Syntax.*Phase/
   And the exit status should be 0
 
+Scenario Outline: Executing phases from a remote project.toml
+  Given I have a remote toml file located at "https://localhost:9999/remote-toml"
+  And I have a project.toml with remote_file pointed at "https://localhost:9999/remote-toml"
+  When I successfully run `delivery local <phase>`
+  Then the output should contain "<phase_output>"
+  Examples:
+    | phase     | phase_output     |
+    | unit      | REMOTE-UNIT      |
+    | lint      | REMOTE-LINT      |
+    | syntax    | REMOTE-SYNTAX    |
+    | provision | REMOTE-PROVISION |
+    | deploy    | REMOTE-DEPLOY    |
+    | smoke     | REMOTE-SMOKE     |
+    | cleanup   | REMOTE-CLEANUP   |
+
 Scenario: Executing the unit phase locally
   When I invoke a pseudo tty with command "delivery local unit"
   And I want to debug the pseudo tty command
@@ -60,12 +75,18 @@ Scenario: Verify that when we modify the `.delivery/project.toml`
   And the ptty exit status should be 0
 
 Scenario: When the project has an invalid `.delivery/project.toml`
-  When I have an incomplete project.toml file
+  Given I have an invalid project.toml file
   And I invoke a pseudo tty with command "delivery local lint"
   And I cd inside my ptty to "local"
   And I run my ptty command
   Then the ptty exit status should be 1
   And the ptty output should contain "Attempted to decode invalid TOML"
+
+Scenario:  When the project has an incomplete `.delivery/project.toml`
+  Given I have an incomplete project.toml file
+  When I run `delivery local lint`
+  Then the output should contain "Phase not implemented"
+  And the exit status should be 1
 
 Scenario: When `.delivery/project.toml` file is missing fail and
           show a helpful message about how to recover, additionally
