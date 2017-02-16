@@ -16,6 +16,7 @@
 //
 
 use std;
+use std::env;
 use std::process;
 use std::time::Duration;
 use std::path::PathBuf;
@@ -23,7 +24,7 @@ use std::path::Path;
 use std::io::prelude::*;
 use std::fs::File;
 use utils;
-use utils::say::{self, sayln};
+use utils::say::{self, sayln, print_error};
 use errors::{Kind, DeliveryError};
 use types::{DeliveryResult, ExitCode};
 use config::Config;
@@ -69,6 +70,10 @@ use command::review::ReviewCommand;
 use command::setup::SetupCommand;
 use command::token::TokenCommand;
 
+pub trait CheckFipsMode {
+    fn is_fips_mode(&self) -> bool;
+}
+
 pub trait CommandPrep {
     fn merge_options_and_config(&self, config: Config) -> DeliveryResult<Config>;
 
@@ -101,25 +106,20 @@ pub trait CommandPrep {
 
         // All unwraps in here are safe since the config code guarantees
         // that they have Some(value) through Default.
-        if config.fips.unwrap_or(false) {
+        if config.is_fips_mode() {
             if !Path::new("/opt/chefdk/embedded/bin/stunnel").exists() {
                 return Err(DeliveryError{ kind: Kind::FipsNotSupportedForChefDKPlatform,
                                           detail: None })
             }
 
-            let stunnl_path_str = try!(generate_stunnel_config(config.server.as_ref().unwrap(),
-                                                               config.fips_git_port.as_ref().unwrap()
+            try!(generate_stunnel_config(config.server.as_ref().unwrap(),
+                                         config.fips_git_port.as_ref().unwrap()
             ));
 
             let cert_string = try!(utils::copy_automate_nginx_cert(config.server.as_ref().unwrap(),
                                                                    config.api_port.as_ref().unwrap()));
             let mut cert_file = try!(File::create(try!(utils::home_dir(&[".chefdk/etc/automate-nginx-cert.pem"]))));
             try!(cert_file.write_all(cert_string.as_bytes()));
-
-            // Spawn the stunnel process for the duration of this command.
-            // Since this process is being supervised by delivery-cli, once the command exits
-            // regardless of success, the stunnel process will shut down.
-            try!(std::process::Command::new("/opt/chefdk/embedded/bin/stunnel").arg(stunnl_path_str).spawn());
         }
 
         Ok(config)
@@ -141,9 +141,56 @@ pub fn run() {
     }
 }
 
-fn execute_command<C: Command>(matches: &ArgMatches, command: C) -> DeliveryResult<ExitCode> {
+fn execute_command<C: Command>(matches: &ArgMatches, command: C, fips_mode: bool) -> DeliveryResult<ExitCode> {
     handle_spinner(&matches);
-    command.run()
+
+    // Store any child processes that need to die even on panic in here.
+    let mut child_processes: Vec<process::Child> = Vec::new();
+    if fips_mode {
+        let stunnel_config_path = try!(utils::home_dir(&[".chefdk/etc/stunnel.conf"])).to_str().unwrap().to_string();
+        let mut stunnel_command = try!(utils::generate_command_from_string(&format!("/opt/chefdk/embedded/bin/stunnel {config}",
+                                                                                config=stunnel_config_path)));
+        child_processes.push(try!(stunnel_command.spawn()));
+    }
+
+    // Attempt to unwind any errors so we can kill child processes properly
+    // and print a more graceful error. Worst case, we are back to where we started.
+    let mut command_result = Ok(1);
+    let command_panic_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        command_result = command.run();
+    }));
+
+    match command_panic_result {
+        // Note that this can contain a DeliveryError.
+        Ok(_) => {
+            try!(kill_child_processes(child_processes));
+            command_result
+        },
+        // This will give a more user friendly error on unwraps
+        // or crashes that aren't error handled.
+        Err(_) => {
+            if env::var_os("RUST_BACKTRACE").is_none() && env::var_os("RUST_LOG").is_none() {
+                let primary_error_str = "An unexpected error occured.\nIf issues persist, please re-run this command with extra debug info prepended to it and report output to Chef:\n";
+                let mut secondary_error_str = "RUST_LOG=debug RUST_BACKTRACE=1 ".to_string();
+                for argument in std::env::args() {
+                    secondary_error_str += &format!("{} ", argument);
+                }
+                secondary_error_str += "\n";
+
+                print_error(primary_error_str, &secondary_error_str);
+            }
+
+            try!(kill_child_processes(child_processes));
+            Ok(1)
+        }
+    }
+}
+
+fn kill_child_processes(child_processes: Vec<process::Child>) -> DeliveryResult<()> {
+    for mut child in child_processes {
+        try!(child.kill());
+    }
+    Ok(())
 }
 
 fn match_command_and_start(app_matches: &ArgMatches, build_version: &str) -> DeliveryResult<ExitCode> {
@@ -152,31 +199,31 @@ fn match_command_and_start(app_matches: &ArgMatches, build_version: &str) -> Del
             let options = api::ApiClapOptions::new(&matches);
             let config = try!(init_command(&options));
             let command = ApiCommand{options: &options, config: &config};
-            execute_command(&matches, command)
+            execute_command(&matches, command, config.is_fips_mode())
         },
         (checkout::SUBCOMMAND_NAME, Some(matches)) => {
             let options = checkout::CheckoutClapOptions::new(&matches);
             let config = try!(init_command(&options));
             let command = CheckoutCommand{options: &options, config: &config};
-            execute_command(&matches, command)
+            execute_command(&matches, command, config.is_fips_mode())
         },
         (clone::SUBCOMMAND_NAME, Some(matches)) => {
             let options = clone::CloneClapOptions::new(&matches);
             let config = try!(init_command(&options));
             let command = CloneCommand{options: &options, config: &config};
-            execute_command(&matches, command)
+            execute_command(&matches, command, config.is_fips_mode())
         },
         (diff::SUBCOMMAND_NAME, Some(matches)) => {
             let options = diff::DiffClapOptions::new(&matches);
             let config = try!(init_command(&options));
             let command = DiffCommand{options: &options, config: &config};
-            execute_command(&matches, command)
+            execute_command(&matches, command, config.is_fips_mode())
         },
         (init::SUBCOMMAND_NAME, Some(matches)) => {
             let options = init::InitClapOptions::new(&matches);
             let config = try!(init_command(&options));
             let command = InitCommand{options: &options, config: &config};
-            execute_command(&matches, command)
+            execute_command(&matches, command, config.is_fips_mode())
         },
         (job::SUBCOMMAND_NAME, Some(matches)) => {
             let options = job::JobClapOptions::new(&matches);
@@ -185,20 +232,20 @@ fn match_command_and_start(app_matches: &ArgMatches, build_version: &str) -> Del
             if !options.docker_image.is_empty() {
                 run_docker_job(&options)
             } else {
-                execute_command(&matches, command)
+                execute_command(&matches, command, config.is_fips_mode())
             }
         },
         (local::SUBCOMMAND_NAME, Some(matches)) => {
             let options = local::LocalClapOptions::new(&matches);
             let config = try!(ProjectToml::load_toml(options.remote_toml));
             let command = LocalCommand{options: &options, config: &config};
-            execute_command(&matches, command)
+            execute_command(&matches, command, config.is_fips_mode())
         },
         (review::SUBCOMMAND_NAME, Some(matches)) => {
             let options = review::ReviewClapOptions::new(&matches);
             let config = try!(init_command(&options));
             let command = ReviewCommand{options: &options, config: &config};
-            execute_command(&matches, command)
+            execute_command(&matches, command, config.is_fips_mode())
         },
         (setup::SUBCOMMAND_NAME, Some(matches)) => {
             let options = setup::SetupClapOptions::new(&matches);
@@ -213,13 +260,13 @@ fn match_command_and_start(app_matches: &ArgMatches, build_version: &str) -> Del
                 config: &config,
                 config_path: &config_path,
             };
-            execute_command(&matches, command)
+            execute_command(&matches, command, config.is_fips_mode())
         },
         (token::SUBCOMMAND_NAME, Some(matches)) => {
             let options = token::TokenClapOptions::new(&matches);
             let config = try!(init_command(&options));
             let command = TokenCommand{options: &options, config: &config};
-            execute_command(&matches, command)
+            execute_command(&matches, command, config.is_fips_mode())
         },
         (spin::SUBCOMMAND_NAME, Some(matches)) => {
             handle_spinner(&matches);
@@ -305,7 +352,7 @@ fn build_git_sha() -> String {
     format!("({})", sha)
 }
 
-fn generate_stunnel_config(server: &str, fips_git_port: &str) -> Result<String, DeliveryError> {
+fn generate_stunnel_config(server: &str, fips_git_port: &str) -> Result<(), DeliveryError> {
     try!(std::fs::create_dir_all(try!(utils::home_dir(&[".chefdk/etc/"]))));
     try!(std::fs::create_dir_all(try!(utils::home_dir(&[".chefdk/log/"]))));
 
@@ -317,6 +364,8 @@ fn generate_stunnel_config(server: &str, fips_git_port: &str) -> Result<String, 
     let output = "output = ".to_string();
     let output_conf = output + try!(utils::home_dir(&[".chefdk/log/stunnel.log\n"])).to_str().unwrap();
     try!(conf_file.write_all(output_conf.as_bytes()));
+
+    try!(conf_file.write_all("foreground = quiet\n".as_bytes()));
 
     try!(conf_file.write_all(b"[git]\n"));
 
@@ -333,7 +382,7 @@ fn generate_stunnel_config(server: &str, fips_git_port: &str) -> Result<String, 
 
     try!(conf_file.write_all(b"verifyChain = yes\n"));
 
-    Ok(stunnel_path.to_str().unwrap().to_string())
+    Ok(())
 }
 
 #[cfg(test)]

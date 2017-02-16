@@ -15,7 +15,7 @@
 // limitations under the License.
 //
 
-use std::process::Command;
+use std::process::{Command, ExitStatus};
 use std::env;
 use errors::{DeliveryError, Kind};
 use libc;
@@ -112,6 +112,11 @@ pub fn find_command(command: &str) -> Option<PathBuf> {
         }
     }
     None
+}
+
+pub fn kill_process_by_id(pid: &u32) -> Result<ExitStatus, DeliveryError> {
+    let result = try!(try!(generate_command_from_string(&format!("kill {pid}", pid=pid))).output());
+    Ok(result.status)
 }
 
 pub fn copy_automate_nginx_cert(server: &str, port: &str) -> Result<String, DeliveryError>
