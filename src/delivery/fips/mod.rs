@@ -25,16 +25,10 @@ use types::DeliveryResult;
 use errors::Kind;
 use config::Config;
 
-pub const STUNNEL_PATH: &'static str = "/opt/chefdk/embedded/bin/stunnel";
-
-pub trait CheckFipsMode {
-    fn is_fips_mode(&self) -> bool;
-}
-
 pub fn setup_and_start_stunnel_if_fips_mode(config: &Config, child_processes: &mut Vec<std::process::Child>) -> DeliveryResult<()> {
     if let Some(fips) = config.fips {
         if fips {
-            if !Path::new(STUNNEL_PATH).exists() {
+            if !Path::new(&utils::stunnel_path()).exists() {
                 return Err(DeliveryError{ kind: Kind::FipsNotSupportedForChefDKPlatform,
                                           detail: None })
             }
@@ -65,7 +59,7 @@ fn start_stunnel(child_processes: &mut Vec<std::process::Child>) -> DeliveryResu
     let stunnel_config_path = try!(utils::home_dir(&[".chefdk/etc/stunnel.conf"])).to_str().unwrap().to_string();
     let mut stunnel_command = 
         try!(utils::generate_command_from_string(&format!("{stunnel_path} {config}",
-                                                          stunnel_path=STUNNEL_PATH,
+                                                          stunnel_path=utils::stunnel_path(),
                                                           config=stunnel_config_path)));
     child_processes.push(try!(stunnel_command.spawn()));
     Ok(())
